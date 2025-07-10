@@ -75,16 +75,22 @@ canvas.addEventListener("drop", e => {
 
 function makeDraggable(box) {
   let startX, startY, boxStartLeft, boxStartTop;
+  let moved = false;
+
   box.addEventListener("mousedown", e => {
     if (e.target.classList.contains("connector")) return;
     startX = e.clientX;
     startY = e.clientY;
     boxStartLeft = parseFloat(box.style.left);
     boxStartTop = parseFloat(box.style.top);
+    moved = false;
 
     function move(ev) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        moved = true;
+      }
       box.style.left = boxStartLeft + dx + "px";
       box.style.top = boxStartTop + dy + "px";
       updateConnections(box);
@@ -93,12 +99,15 @@ function makeDraggable(box) {
     function up() {
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
+      // Quando soltar, marca na propriedade dataset se moveu
+      box.dataset.wasMoved = moved ? "true" : "false";
     }
 
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
   });
 }
+
 
 function attachConnectorListeners(box) {
   box.querySelectorAll(".connector").forEach(connector => {
@@ -219,13 +228,16 @@ function attachHoverListeners(box) {
 
   inner.addEventListener("click", (e) => {
     e.stopPropagation();
+
+    if( shouldIgnoreClickDueToMove(box) ) return;
+
     const stepId = parseInt(box.getAttribute("data-id"));
     const step = stepsList.find(s => s.id === stepId);
     if (step) {
       showActionsModal(step);
     }
   });
-
+  
   const transitionBar = box.querySelector(".transition");
   transitionBar.addEventListener("mouseenter", () => {
     transitionBar.classList.add("hover-highlight");
@@ -238,6 +250,8 @@ function attachHoverListeners(box) {
   transitionBar.addEventListener("click", (e) => {
     e.stopPropagation();
 
+    if( shouldIgnoreClickDueToMove(box) ) return;
+  
     const stepId = parseInt(box.getAttribute("data-id"));
     const step = stepsList.find(s => s.id === stepId);
     if (!step || !step.transitions || step.transitions.length === 0) {
@@ -247,6 +261,7 @@ function attachHoverListeners(box) {
     const transition = step.transitions[0]; // assumindo uma única transição
     showReceptivityModal(transition, transitionBar);
   });
+
   // Criar elemento <span> que mostrará a receptividade
   const receptivityLabel = document.createElement("span");
   receptivityLabel.className = "receptivity-label";
@@ -573,6 +588,14 @@ function showActionsModal(step) {
   modal.querySelector("#cancel-actions").addEventListener("click", () => {
     document.body.removeChild(overlay);
   });
+}
+
+function shouldIgnoreClickDueToMove(box) {
+  if (box.dataset.wasMoved === "true") {
+    box.dataset.wasMoved = "false";
+    return true;
+  }
+  return false;
 }
 
 function doCompile() {
