@@ -196,7 +196,7 @@
     font-size: 12px;
     white-space: nowrap;
     cursor: default;
-    width: calc(2*var(--active_side));
+    width: var(--active_side);
     height: var(--active_side)
   }
 
