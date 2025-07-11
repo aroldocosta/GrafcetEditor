@@ -6,6 +6,7 @@ const connections = [];
 const stepsList = [];
 let transitionCounter = 0;
 let boxCounter = 0;
+let clickTimeout = null;
 
 palette.querySelectorAll(".box").forEach(box => {
   box.addEventListener("dragstart", e => {
@@ -218,6 +219,7 @@ function attachConnectorListeners(box) {
 }
 
 function attachHoverListeners(box) {
+  
   const inner = box.querySelector(".inner-rect");
   box.addEventListener("mouseenter", () => {
     inner.classList.add("hover-highlight");
@@ -228,14 +230,16 @@ function attachHoverListeners(box) {
 
   inner.addEventListener("click", (e) => {
     e.stopPropagation();
-
+   
     if( shouldIgnoreClickDueToMove(box) ) return;
 
-    const stepId = parseInt(box.getAttribute("data-id"));
-    const step = stepsList.find(s => s.id === stepId);
-    if (step) {
-      showActionsModal(step);
-    }
+    clickTimeout = setTimeout(() => {
+      const stepId = parseInt(box.getAttribute("data-id"));
+      const step = stepsList.find(s => s.id === stepId);
+      if (step) {
+        showActionsModal(step);
+      }
+    }, 320);
   });
   
   const transitionBar = box.querySelector(".transition");
@@ -280,7 +284,16 @@ function attachHoverListeners(box) {
 
 
 function attachRemoveListener(box) {
-  box.addEventListener("dblclick", () => {
+  box.addEventListener("dblclick", (e) => {
+
+    e.stopPropagation()
+
+    // Cancelar click pendente (se houver)
+    if (clickTimeout) {
+      clearTimeout(clickTimeout);
+      clickTimeout = null;
+    }
+
     const svg = getOrCreateSVG();
     for (let i = connections.length - 1; i >= 0; i--) {
       const c = connections[i];
