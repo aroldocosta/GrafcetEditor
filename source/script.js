@@ -3,10 +3,10 @@ const palette = document.getElementById("palette");
 const testBtn = document.getElementById("test-states");
 let currentConnection = null;
 const connections = [];
-const transitionsList = [];
 const stepsList = [];
 let transitionCounter = 0;
 let boxCounter = 0;
+let clickTimeout = null;
 
 palette.querySelectorAll(".box").forEach(box => {
   box.addEventListener("dragstart", e => {
@@ -53,7 +53,7 @@ canvas.addEventListener("drop", e => {
 
   const inner = clone.querySelector(".inner-rect");
   if (state === "active") {
-    inner.style.border = "4px double darkblue";
+    inner.style.border = "5px double darkblue";
   }
 
   canvas.appendChild(clone);
@@ -76,16 +76,22 @@ canvas.addEventListener("drop", e => {
 
 function makeDraggable(box) {
   let startX, startY, boxStartLeft, boxStartTop;
+  let moved = false;
+
   box.addEventListener("mousedown", e => {
     if (e.target.classList.contains("connector")) return;
     startX = e.clientX;
     startY = e.clientY;
     boxStartLeft = parseFloat(box.style.left);
     boxStartTop = parseFloat(box.style.top);
+    moved = false;
 
     function move(ev) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        moved = true;
+      }
       box.style.left = boxStartLeft + dx + "px";
       box.style.top = boxStartTop + dy + "px";
       updateConnections(box);
@@ -94,12 +100,15 @@ function makeDraggable(box) {
     function up() {
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
+      // Quando soltar, marca na propriedade dataset se moveu
+      box.dataset.wasMoved = moved ? "true" : "false";
     }
 
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
   });
 }
+
 
 function attachConnectorListeners(box) {
   box.querySelectorAll(".connector").forEach(connector => {
@@ -210,6 +219,7 @@ function attachConnectorListeners(box) {
 }
 
 function attachHoverListeners(box) {
+  
   const inner = box.querySelector(".inner-rect");
   box.addEventListener("mouseenter", () => {
     inner.classList.add("hover-highlight");
@@ -217,10 +227,73 @@ function attachHoverListeners(box) {
   box.addEventListener("mouseleave", () => {
     inner.classList.remove("hover-highlight");
   });
+
+  inner.addEventListener("click", (e) => {
+    e.stopPropagation();
+   
+    if( shouldIgnoreClickDueToMove(box) ) return;
+
+    clickTimeout = setTimeout(() => {
+      const stepId = parseInt(box.getAttribute("data-id"));
+      const step = stepsList.find(s => s.id === stepId);
+      if (step) {
+        showActionsModal(step);
+      }
+    }, 320);
+  });
+  
+  const transitionBar = box.querySelector(".transition");
+  transitionBar.addEventListener("mouseenter", () => {
+    transitionBar.classList.add("hover-highlight");
+  });
+  transitionBar.addEventListener("mouseleave", () => {
+    transitionBar.classList.remove("hover-highlight");
+  });
+
+  // Novo listener de click para abrir o modal
+  transitionBar.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    if( shouldIgnoreClickDueToMove(box) ) return;
+  
+    const stepId = parseInt(box.getAttribute("data-id"));
+    const step = stepsList.find(s => s.id === stepId);
+    if (!step || !step.transitions || step.transitions.length === 0) {
+      console.warn("Nenhuma transição encontrada para este step.");
+      return;
+    }
+    const transition = step.transitions[0]; // assumindo uma única transição
+    showReceptivityModal(transition, transitionBar);
+  });
+
+  // Criar elemento <span> que mostrará a receptividade
+  const receptivityLabel = document.createElement("span");
+  receptivityLabel.className = "receptivity-label";
+  receptivityLabel.textContent = "";
+  receptivityLabel.style.position = "absolute";
+  receptivityLabel.style.left = "30px"; // à direita do tracinho
+  receptivityLabel.style.top = "50%";
+  receptivityLabel.style.transform = "translateY(-50%)";
+  receptivityLabel.style.fontSize = "14px";
+  receptivityLabel.style.color = "#333";
+  receptivityLabel.style.fontWeight = "bold";
+  receptivityLabel.style.pointerEvents = "none";
+  transitionBar.appendChild(receptivityLabel);
+
 }
 
+
 function attachRemoveListener(box) {
-  box.addEventListener("dblclick", () => {
+  box.addEventListener("dblclick", (e) => {
+
+    e.stopPropagation()
+
+    // Cancelar click pendente (se houver)
+    if (clickTimeout) {
+      clearTimeout(clickTimeout);
+      clickTimeout = null;
+    }
+
     const svg = getOrCreateSVG();
     for (let i = connections.length - 1; i >= 0; i--) {
       const c = connections[i];
@@ -307,11 +380,11 @@ function addStepConnection(fromBox, toBox) {
   const toStep = stepsList.find(s => s.id === toId);
   if (!fromStep || !toStep) return;
 
-  if (!fromStep.outputs.includes(toId)) {
-    fromStep.outputs.push(toId);
+  if (!fromStep.outputs.includes(toStep.id)) {
+    fromStep.outputs.push(toStep.id);
   }
-  if (!toStep.inputs.includes(fromId)) {
-    toStep.inputs.push(fromId);
+  if (!toStep.inputs.includes(fromStep.id)) {
+    toStep.inputs.push(fromStep.id);
   }
 }
 
@@ -328,71 +401,219 @@ function removeStepConnection(connection) {
   toStep.inputs = toStep.inputs.filter(id => id !== fromId);
 }
 
-testBtn.addEventListener("click", () => {
-  const boxes = canvas.querySelectorAll(".box");
-  let i = 0;
-  function activateNext() {
-    if (i > 0) {
-      const prev = boxes[i - 1];
-      prev.dataset.state = "inactive";
-      prev.querySelector(".inner-rect").style.border = "";
-    }
-    if (i < boxes.length) {
-      const current = boxes[i];
-      current.dataset.state = "active";    
-      let id = Number(current.dataset.id);                                
-      current.querySelector(".inner-rect").style.border = stepsList[id - 1].type == "start_step" 
-                                                              ? "4px double darkblue" 
-                                                              : "2px solid darkblue";
+function updateStepsView() {
+  // Antes de atualizar, limpa todos os elementos de ação existentes
+  const oldActionBoxes = canvas.querySelectorAll(".action-box, .action-line, .action-tooltip");
+  oldActionBoxes.forEach(el => el.remove());
 
-      console.log("Box state: ", current)
-      i++;
-      setTimeout(activateNext, 1000);
-    }
-  }
-  activateNext();
-});
-
-function atualizarVisualizacaoSteps() {
   stepsList.forEach(step => {
     const inner = step.element.querySelector(".inner-rect");
-    // if (step.state === "active") {
-    //   inner.style.border = step.type === "start_step"
-    //     ? "4px double darkblue"
-    //     : "2px solid darkblue";
-    // } else {
-    //   inner.style.border = "";
-    // }
+    if (step.state === "active") {
+      inner.style.border = step.type === "start_step"
+        ? "5px double darkblue"
+        : "3px solid darkblue";
+    } else {
+      inner.style.border = "";
+    }
 
-    step.transitions.forEach(trId => {
-      transitionsList.filter(t => t.id == trId).map(t => {
-        if(t.triggered) {
-          console.log(t.id + " is Triggered");
+    // Renderizar Actions ao lado direito do Step
+    if (step.actions && step.actions.length > 0) {
+      const rect = step.element.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
 
-          if(t.triggered) {
-            let inputIds = t.inputSteps;
-            let outputIds = t.outputSteps;
+      const baseLeft = parseFloat(step.element.style.left) + 110; // desloca para direita
+      const baseTop = parseFloat(step.element.style.top) + 20; // alinhamento vertical
 
-            console.log("InputStepsIds", inputIds);
-            console.log("OutputStepsIds", outputIds);
+      step.actions.forEach((action, idx) => {
 
-            inputIds.forEach(i => {
-              stepsList.filter(s => i == s.id).state = "inactive";
-            })
-
-            outputIds.forEach(o => {
-              stepsList.filter(s => i == s.id).state = "active";
-            });
-          }
-        } else {
-          //console.log(t.id + " is NOT Triggered");
+        if(idx == 0) { //Primeia ação
+        // Linha de conexão
+          const line = document.createElement("div");
+          line.className = "action-line";
+          line.style.left = (baseLeft - 30 + idx * 110) + "px";
+          line.style.top = (baseTop + 20) + "px";
+          canvas.appendChild(line);
         }
+
+        // Caixa da ação
+        const box = document.createElement("div");
+        box.className = "action-box";
+        box.style.left = (baseLeft - 10 + idx * 110) + "px";
+        box.style.top = (baseTop - 8) + "px";
+        box.style.fontSize = "1.1em";
+        box.style.textAlign = "center";
+        box.style.fontStyle = "italic";
+        box.style.fontWeight = "bold";
+        box.style.overflowWrap = "anywhere";
+
+        const commandsText = action.commands.map(c => `${c}`).join(", ");
+        box.textContent = commandsText;
+        box.textContent.marginTop = "20px";
+
+        // Tooltip ao passar o mouse
+        box.addEventListener("mouseenter", (e) => {
+          const tooltip = document.createElement("div");
+          tooltip.className = "action-tooltip";
+          tooltip.innerHTML = `
+            <strong>ID:</strong> ${action.id || "-"}<br>
+            <strong>Type:</strong> ${action.type || "-"}<br>
+            <strong>Qualifier:</strong> ${action.qualifier || "-"}<br>
+            <strong>Description:</strong> ${action.description || "-"}
+          `;
+          tooltip.style.left = (parseFloat(box.style.left) + 110) + "px";
+          tooltip.style.top = (parseFloat(box.style.top) - 5) + "px";
+          canvas.appendChild(tooltip);
+        });
+
+        box.addEventListener("mouseleave", () => {
+          const tooltip = canvas.querySelector(".action-tooltip");
+          if (tooltip) tooltip.remove();
+        });
+
+        canvas.appendChild(box);
       });
-    })
+    }
 
-
+    // Atualizar transições
+    step.transitions.forEach(t => {
+      if(step.state === "active" && t.triggered) {
+        t.triggered = false;
+        step.state = "inactive";
+        step.outputs.forEach(stepId => {
+            stepsList[stepId-1].state = "active";
+        });
+      }
+    });
   });
 }
 
-// Executar a cada 1000 ms
-setInterval(atualizarVisualizacaoSteps, 1000);
+function showReceptivityModal(transition, transitionBar) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+
+  const modal = document.createElement("div");
+  modal.className = "modal";
+
+  modal.innerHTML = `
+    <h2>Editar Receptividade</h2>
+    <input type="text" id="receptivity-input" placeholder="Digite a receptividade" value="${transition.receptivity}">
+    <div style="text-align:right;">
+      <button id="save-receptivity">Salvar</button>
+      <button id="cancel-receptivity">Cancelar</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  modal.querySelector("#save-receptivity").addEventListener("click", () => {
+    const value = modal.querySelector("#receptivity-input").value.trim();
+    transition.setReceptivity(value);
+
+    const label = transitionBar.querySelector(".receptivity-label");
+    if (label) {
+      label.textContent = value;
+    }
+
+    document.body.removeChild(overlay);
+    console.log(`Receptividade da transição ${transition.id} atualizada para: "${value}"`);
+  });
+
+  modal.querySelector("#cancel-receptivity").addEventListener("click", () => {
+    document.body.removeChild(overlay);
+  });
+}
+
+function showActionsModal(step) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+
+  const modal = document.createElement("div");
+  modal.className = "modal";
+
+  modal.innerHTML = `
+    <h2>Ações do Step ${step.id}</h2>
+    <div id="actions-container"></div>
+    <button id="add-action">Adicionar Ação</button>
+    <div style="margin-top:10px; text-align:right;">
+      <button id="save-actions">Salvar Todas</button>
+      <button id="cancel-actions">Cancelar</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const actionsContainer = modal.querySelector("#actions-container");
+
+  // Função para criar campos de uma ação
+  function createActionFields(action = {}) {
+    const div = document.createElement("div");
+    div.className = "action-fields";
+    div.style.border = "1px solid #ccc";
+    div.style.padding = "5px";
+    div.style.marginBottom = "5px";
+
+    div.innerHTML = `
+      <input type="text" placeholder="ID" value="${action.id || ''}" style="width: 60px; margin-right:3px;">
+      <input type="text" placeholder="Type" value="${action.type || ''}" style="width: 80px; margin-right:3px;">
+      <input type="text" placeholder="Commands" value="${(action.commands || []).join(',')}" style="width: 120px; margin-right:3px;">
+      <input type="text" placeholder="Qualifier" value="${action.qualifier || ''}" style="width: 80px; margin-right:3px;">
+      <input type="text" placeholder="Description" value="${action.description || ''}" style="width: 100px; margin-right:3px;">
+      <button class="remove-action">X</button>
+    `;
+
+    div.querySelector(".remove-action").addEventListener("click", () => {
+      actionsContainer.removeChild(div);
+    });
+
+    actionsContainer.appendChild(div);
+  }
+
+  // Carregar ações existentes
+  if (step.actions.length > 0) {
+    step.actions.forEach(a => createActionFields(a));
+  } else {
+    createActionFields();
+  }
+
+  modal.querySelector("#add-action").addEventListener("click", () => {
+    createActionFields();
+  });
+
+  modal.querySelector("#save-actions").addEventListener("click", () => {
+    const actionDivs = [...actionsContainer.querySelectorAll(".action-fields")];
+    const newActions = actionDivs.map(div => {
+      const inputs = div.querySelectorAll("input");
+      return new Action({
+        id: inputs[0].value.trim(),
+        type: inputs[1].value.trim(),
+        commands: inputs[2].value.trim() ? inputs[2].value.trim().split(",").map(s=>s.trim()) : [],
+        qualifier: inputs[3].value.trim(),
+        description: inputs[4].value.trim()
+      });
+    });
+    step.actions = newActions;
+    document.body.removeChild(overlay);
+    console.log(`Step ${step.id} - ${newActions.length} ações salvas:`, newActions);
+  });
+
+  modal.querySelector("#cancel-actions").addEventListener("click", () => {
+    document.body.removeChild(overlay);
+  });
+}
+
+function shouldIgnoreClickDueToMove(box) {
+  if (box.dataset.wasMoved === "true") {
+    box.dataset.wasMoved = "false";
+    return true;
+  }
+  return false;
+}
+
+function doCompile() {
+  compile(stepsList);
+}
+
+// Executar a cada 200 ms
+setInterval(updateStepsView, 100);

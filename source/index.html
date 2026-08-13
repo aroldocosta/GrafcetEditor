@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Drag & Drop GRAFCET</title>
+  <link rel="stylesheet" href="modal.css">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -26,7 +27,7 @@
       <div class="connector top active"></div>
       <div class="connector bottom active"></div>
     </div>
-    <button id="test-states">Testar States</button>
+    <button onclick="doCompile()">COPILAR</button>
   </div>
 
   <div id="canvas"></div>
@@ -35,5 +36,6 @@
   <script src="transition.js"></script>
   <script src="action.js"></script>
   <script src="script.js"></script>
+  <script src="compiler.js"></script>
 </body>
 </html>

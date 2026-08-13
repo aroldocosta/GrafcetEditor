@@ -26,8 +26,7 @@ class Step {
       outputSteps: [],
       description: ''
     });
-    transitionsList.push(newTransition);
-    step.transitions.push(newTransition.id);
+    step.transitions.push(newTransition);
   }
   
   function printSteps() {
