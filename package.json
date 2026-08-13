@@ -1,0 +1,20 @@
+{
+  "name": "grafcet-editor-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Grafcet Editor Monorepo - Core Compiler, Web UI, HTTP Deploy Server & Desktop App",
+  "scripts": {
+    "dev": "bun --cwd packages/server dev & bun --cwd packages/ui dev",
+    "dev:ui": "bun --cwd packages/ui dev",
+    "dev:server": "bun --cwd packages/server dev",
+    "build": "bun --cwd packages/core build && bun --cwd packages/server build",
+    "test": "bun --cwd packages/core test"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

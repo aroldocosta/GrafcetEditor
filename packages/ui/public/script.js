@@ -424,21 +424,21 @@ function updateStepsView() {
       const baseLeft = parseFloat(step.element.style.left) + 110; // desloca para direita
       const baseTop = parseFloat(step.element.style.top) + 20; // alinhamento vertical
 
-      step.actions.forEach((action, idx) => {
+      const actionWidth = 55; // 56px de largura com 1px de sobreposição de borda
 
-        if(idx == 0) { //Primeia ação
-        // Linha de conexão
+      step.actions.forEach((action, idx) => {
+        if (idx === 0) { // Primeira ação (conecta a linha ao Step)
           const line = document.createElement("div");
           line.className = "action-line";
-          line.style.left = (baseLeft - 30 + idx * 110) + "px";
+          line.style.left = (baseLeft - 30) + "px";
           line.style.top = (baseTop + 20) + "px";
           canvas.appendChild(line);
         }
 
-        // Caixa da ação
+        // Caixa da ação (colada no quadro anterior)
         const box = document.createElement("div");
         box.className = "action-box";
-        box.style.left = (baseLeft - 10 + idx * 110) + "px";
+        box.style.left = (baseLeft - 10 + idx * actionWidth) + "px";
         box.style.top = (baseTop - 8) + "px";
         box.style.fontSize = "1.1em";
         box.style.textAlign = "center";
@@ -446,19 +446,38 @@ function updateStepsView() {
         box.style.fontWeight = "bold";
         box.style.overflowWrap = "anywhere";
 
-        const commandsText = action.commands.map(c => `${c}`).join(", ");
+        // Formatar rótulo da bobina (ex: XQ1, SM5)
+        const q = action.qualifier || 'X';
+        const r = action.resourceType || (action.target ? action.target.replace(/\d+/g, '') : 'Q');
+        const c = action.channel || (action.target ? action.target.replace(/\D+/g, '') : 1);
+        const coilLabel = action.target ? `${q}${action.target}` : `${q}${r}${c}`;
+
+        const commandsText = (action.commands && Array.isArray(action.commands))
+          ? action.commands.join(", ")
+          : coilLabel;
+
         box.textContent = commandsText;
-        box.textContent.marginTop = "20px";
+
+        box.style.cursor = "pointer";
+
+        // Clique esquerdo na ação para abrir o modal de edição
+        box.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const tooltip = canvas.querySelector(".action-tooltip");
+          if (tooltip) tooltip.remove();
+          showActionsModal(step);
+        });
 
         // Tooltip ao passar o mouse
         box.addEventListener("mouseenter", (e) => {
           const tooltip = document.createElement("div");
           tooltip.className = "action-tooltip";
           tooltip.innerHTML = `
-            <strong>ID:</strong> ${action.id || "-"}<br>
-            <strong>Type:</strong> ${action.type || "-"}<br>
-            <strong>Qualifier:</strong> ${action.qualifier || "-"}<br>
-            <strong>Description:</strong> ${action.description || "-"}
+            <strong>Bobina:</strong> ${coilLabel}<br>
+            <strong>Qualificador:</strong> ${q}<br>
+            <strong>Tipo:</strong> ${r}<br>
+            <strong>Canal:</strong> ${c}<br>
+            <strong>Descrição:</strong> ${action.description || "-"}
           `;
           tooltip.style.left = (parseFloat(box.style.left) + 110) + "px";
           tooltip.style.top = (parseFloat(box.style.top) - 5) + "px";
@@ -530,14 +549,18 @@ function showActionsModal(step) {
 
   const modal = document.createElement("div");
   modal.className = "modal";
+  modal.style.minWidth = "520px";
 
   modal.innerHTML = `
     <h2>Ações do Step ${step.id}</h2>
+    <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">
+      Sintaxe da Bobina: <code>{Qualificador}{Tipo}{Canal}</code> (Exemplo: <b>XQ3</b>, <b>SM5</b>, <b>ZQ2</b>)
+    </p>
     <div id="actions-container"></div>
-    <button id="add-action">Adicionar Ação</button>
-    <div style="margin-top:10px; text-align:right;">
-      <button id="save-actions">Salvar Todas</button>
-      <button id="cancel-actions">Cancelar</button>
+    <button id="add-action" style="margin-top:5px;">+ Adicionar Ação</button>
+    <div style="margin-top:15px; text-align:right;">
+      <button id="save-actions" style="background:#2563eb; color:#fff; padding:6px 14px; border:none; border-radius:4px; cursor:pointer;">Salvar Todas</button>
+      <button id="cancel-actions" style="margin-left:5px; padding:6px 14px;">Cancelar</button>
     </div>
   `;
 
@@ -546,22 +569,86 @@ function showActionsModal(step) {
 
   const actionsContainer = modal.querySelector("#actions-container");
 
-  // Função para criar campos de uma ação
   function createActionFields(action = {}) {
     const div = document.createElement("div");
     div.className = "action-fields";
-    div.style.border = "1px solid #ccc";
-    div.style.padding = "5px";
-    div.style.marginBottom = "5px";
+    div.style.border = "1px solid #e2e8f0";
+    div.style.borderRadius = "6px";
+    div.style.padding = "8px 10px";
+    div.style.marginBottom = "8px";
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.gap = "8px";
+    div.style.background = "#f8fafc";
+
+    const qualifier = action.qualifier || (action.type === 'S' ? 'S' : action.type === 'R' ? 'R' : action.type === 'Z' ? 'Z' : action.type === 'T' ? 'T' : 'X');
+    let resourceType = action.resourceType || 'Q';
+    let channel = Number(action.channel) || 1;
+
+    // Compatibilidade com dados legados (ex: "Q1", "M5")
+    if (action.target && !action.resourceType) {
+      const match = action.target.match(/^([a-zA-Z]+)(\d+)$/);
+      if (match) {
+        resourceType = match[1].toUpperCase();
+        channel = parseInt(match[2], 10);
+      }
+    }
+
+    const channelOptions = [1, 2, 3, 4, 5, 6, 7, 8]
+      .map(n => `<option value="${n}" ${channel === n ? 'selected' : ''}>${n}</option>`)
+      .join('');
 
     div.innerHTML = `
-      <input type="text" placeholder="ID" value="${action.id || ''}" style="width: 60px; margin-right:3px;">
-      <input type="text" placeholder="Type" value="${action.type || ''}" style="width: 80px; margin-right:3px;">
-      <input type="text" placeholder="Commands" value="${(action.commands || []).join(',')}" style="width: 120px; margin-right:3px;">
-      <input type="text" placeholder="Qualifier" value="${action.qualifier || ''}" style="width: 80px; margin-right:3px;">
-      <input type="text" placeholder="Description" value="${action.description || ''}" style="width: 100px; margin-right:3px;">
-      <button class="remove-action">X</button>
+      <!-- 1. Qualificador: Normal(X), Set(S), Reset(R), Toggle(Z), Timed(T) -->
+      <select class="action-qualifier" title="Qualificador" style="height: 32px; margin: 0; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
+        <option value="X" ${qualifier === 'X' || qualifier === 'N' ? 'selected' : ''}>Normal(X)</option>
+        <option value="S" ${qualifier === 'S' ? 'selected' : ''}>Set(S)</option>
+        <option value="R" ${qualifier === 'R' ? 'selected' : ''}>Reset(R)</option>
+        <option value="Z" ${qualifier === 'Z' ? 'selected' : ''}>Toggle(Z)</option>
+        <option value="T" ${qualifier === 'T' ? 'selected' : ''}>Timed(T)</option>
+      </select>
+
+      <!-- 2. Tipo: Relé(Q), Memoria(M), Timer(T), Contador(C), Comparador(A) -->
+      <select class="action-resource" title="Tipo" style="height: 32px; margin: 0; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
+        <option value="Q" ${resourceType === 'Q' ? 'selected' : ''}>Relé(Q)</option>
+        <option value="M" ${resourceType === 'M' ? 'selected' : ''}>Memoria(M)</option>
+        <option value="T" ${resourceType === 'T' ? 'selected' : ''}>Timer(T)</option>
+        <option value="C" ${resourceType === 'C' ? 'selected' : ''}>Contador(C)</option>
+        <option value="A" ${resourceType === 'A' ? 'selected' : ''}>Comparador(A)</option>
+      </select>
+
+      <!-- 3. Canal (1 a 8 com largura 25% maior: 65px) -->
+      <select class="action-channel" title="Canal" style="height: 32px; width: 65px; min-width: 65px; margin: 0; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
+        ${channelOptions}
+      </select>
+
+      <!-- 4. Preview Badge (Fundo cinza claro, mesma altura 32px) -->
+      <span class="action-preview" style="display: inline-flex; align-items: center; justify-content: center; height: 32px; margin: 0; padding: 0 10px; background: #e2e8f0; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 0.9rem; min-width: 55px; box-sizing: border-box; vertical-align: middle;">
+        ${qualifier}${resourceType}${channel}
+      </span>
+
+      <!-- 5. Descrição (Totalmente Alinhada, sem margem inferior, mesma altura 32px) -->
+      <input type="text" class="action-description" placeholder="Descrição da Ação" value="${action.description || ''}" style="height: 32px; flex: 1; margin: 0 !important; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
+
+      <button class="remove-action" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">X</button>
     `;
+
+    // Atualizar preview dinamicamente ao alterar os selects
+    const qSelect = div.querySelector(".action-qualifier");
+    const rSelect = div.querySelector(".action-resource");
+    const cSelect = div.querySelector(".action-channel");
+    const preview = div.querySelector(".action-preview");
+
+    function updatePreview() {
+      const q = qSelect.value;
+      const r = rSelect.value;
+      const c = cSelect.value || 1;
+      preview.textContent = `${q}${r}${c}`;
+    }
+
+    qSelect.addEventListener("change", updatePreview);
+    rSelect.addEventListener("change", updatePreview);
+    cSelect.addEventListener("change", updatePreview);
 
     div.querySelector(".remove-action").addEventListener("click", () => {
       actionsContainer.removeChild(div);
@@ -571,7 +658,7 @@ function showActionsModal(step) {
   }
 
   // Carregar ações existentes
-  if (step.actions.length > 0) {
+  if (step.actions && step.actions.length > 0) {
     step.actions.forEach(a => createActionFields(a));
   } else {
     createActionFields();
@@ -583,16 +670,23 @@ function showActionsModal(step) {
 
   modal.querySelector("#save-actions").addEventListener("click", () => {
     const actionDivs = [...actionsContainer.querySelectorAll(".action-fields")];
-    const newActions = actionDivs.map(div => {
-      const inputs = div.querySelectorAll("input");
-      return new Action({
-        id: inputs[0].value.trim(),
-        type: inputs[1].value.trim(),
-        commands: inputs[2].value.trim() ? inputs[2].value.trim().split(",").map(s=>s.trim()) : [],
-        qualifier: inputs[3].value.trim(),
-        description: inputs[4].value.trim()
-      });
+    const newActions = actionDivs.map((div, index) => {
+      const q = div.querySelector(".action-qualifier").value;
+      const r = div.querySelector(".action-resource").value;
+      const c = parseInt(div.querySelector(".action-channel").value, 10) || 1;
+      const desc = div.querySelector(".action-description").value.trim();
+
+      return {
+        id: index + 1,
+        qualifier: q,
+        resourceType: r,
+        channel: c,
+        type: q,               // compatibilidade
+        target: `${r}${c}`,   // ex: "Q3"
+        description: desc
+      };
     });
+
     step.actions = newActions;
     document.body.removeChild(overlay);
     console.log(`Step ${step.id} - ${newActions.length} ações salvas:`, newActions);

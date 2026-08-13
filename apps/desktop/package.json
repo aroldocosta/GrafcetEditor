@@ -1,0 +1,10 @@
+{
+  "name": "@grafcet/desktop",
+  "version": "1.0.0",
+  "description": "Grafcet Editor Desktop App (Tauri v2)",
+  "main": "index.js",
+  "scripts": {
+    "dev": "echo 'Tauri v2 desktop wrapper initialized. Run tauri dev when rust/tauri-cli is configured.'",
+    "build": "echo 'Tauri v2 desktop build stub.'"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@grafcet/ui",
+  "version": "1.0.0",
+  "description": "Grafcet Editor Web User Interface",
+  "main": "public/index.html",
+  "scripts": {
+    "dev": "bun x serve public -p 8080",
+    "start": "bun x serve public -p 8080"
+  },
+  "dependencies": {
+    "@grafcet/core": "workspace:*"
+  }
+}
