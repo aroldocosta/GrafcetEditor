@@ -5,9 +5,15 @@ export interface ActionNode {
   id?: number | string;
   qualifier: CoilQualifier;    // X (Normal), S (Set), R (Reset), Z (Toggle), T (Timer)
   resourceType: ResourceType;  // Q (Relé), M (Memória), T (Timer), C (Contador), A (Analógico)
-  channel: number;             // Canal / Índice (1, 2, 3...)
+  channel: number;             // Canal / ID (1, 2, 3...)
   description?: string;
   
+  // Parâmetros de Recursos T, C, A (userver03)
+  preset?: number;             // pst
+  offset?: number;             // ofs
+  functionType?: number;       // fun
+  port?: number;               // prt (somente Comparadores A)
+
   // Propriedades herdadas/compatibilidade
   type?: string;
   target?: string;

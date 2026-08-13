@@ -86,28 +86,104 @@ export class Userver03Generator implements ICodeGenerator {
       }
     }
 
-    // 3. Montar a estrutura final do JSON do userver03 (/code_param.cfg)
+    // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
+    const timersMap = new Map<number, { id: number; fun: number; pst: number; ofs: number }>();
+    const countersMap = new Map<number, { id: number; fun: number; pst: number; ofs: number }>();
+    const comparersMap = new Map<number, { id: number; prt: number; fun: number; pst: number; ofs: number }>();
+
+    // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparers
+    (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
+    (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
+    (ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+
+    // Varrer ações das etapas para incluir configurações de T, C, A definidos nas ações
+    for (const step of ir.steps) {
+      for (const action of step.actions) {
+        let resourceType = (action.resourceType || '').toUpperCase();
+        let channel = Number(action.channel);
+
+        // Fallback de extração se o alvo veio de string como "T1", "C2" ou "A1"
+        if ((!resourceType || isNaN(channel)) && action.target) {
+          const match = action.target.match(/^([a-zA-Z]+)(\d+)$/);
+          if (match) {
+            resourceType = match[1].toUpperCase();
+            channel = parseInt(match[2], 10);
+          }
+        }
+
+        if (resourceType === 'T' && !isNaN(channel)) {
+          if (!timersMap.has(channel) || action.preset !== undefined) {
+            timersMap.set(channel, {
+              id: channel,
+              fun: action.functionType ?? 1,
+              pst: action.preset ?? 5,
+              ofs: action.offset ?? 0
+            });
+          }
+        } else if (resourceType === 'C' && !isNaN(channel)) {
+          if (!countersMap.has(channel) || action.preset !== undefined) {
+            countersMap.set(channel, {
+              id: channel,
+              fun: action.functionType ?? 1,
+              pst: action.preset ?? 5,
+              ofs: action.offset ?? 0
+            });
+          }
+        } else if (resourceType === 'A' && !isNaN(channel)) {
+          if (!comparersMap.has(channel) || action.preset !== undefined) {
+            comparersMap.set(channel, {
+              id: channel,
+              prt: action.port ?? 1,
+              fun: action.functionType ?? 2,
+              pst: action.preset ?? 2.15,
+              ofs: action.offset ?? 0
+            });
+          }
+        }
+      }
+    }
+
+    // Varrer receptividades das transições para auto-detectar T, C, A referenciados no fluxo (ex: T1, T2)
+    for (const transition of ir.transitions) {
+      if (transition.receptivity) {
+        const timerMatches = transition.receptivity.match(/\bT(\d+)\b/gi);
+        if (timerMatches) {
+          timerMatches.forEach(m => {
+            const id = parseInt(m.substring(1), 10);
+            if (!isNaN(id) && !timersMap.has(id)) {
+              timersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+            }
+          });
+        }
+
+        const counterMatches = transition.receptivity.match(/\bC(\d+)\b/gi);
+        if (counterMatches) {
+          counterMatches.forEach(m => {
+            const id = parseInt(m.substring(1), 10);
+            if (!isNaN(id) && !countersMap.has(id)) {
+              countersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+            }
+          });
+        }
+
+        const comparerMatches = transition.receptivity.match(/\bA(\d+)\b/gi);
+        if (comparerMatches) {
+          comparerMatches.forEach(m => {
+            const id = parseInt(m.substring(1), 10);
+            if (!isNaN(id) && !comparersMap.has(id)) {
+              comparersMap.set(id, { id: id, prt: 1, fun: 2, pst: 2.15, ofs: 0 });
+            }
+          });
+        }
+      }
+    }
+
+    // 4. Montar a estrutura final do JSON do userver03 (/code_param.cfg)
     const jsonOutput = {
       lines: lines,
-      timers: (ir.timers || []).map(t => ({
-        id: t.id,
-        pst: t.preset,
-        ofs: t.offset,
-        fun: t.functionType
-      })),
-      counters: (ir.counters || []).map(c => ({
-        id: c.id,
-        pst: c.preset,
-        ofs: c.offset,
-        fun: c.functionType
-      })),
-      comparers: (ir.comparers || []).map(cmp => ({
-        id: cmp.id,
-        prt: cmp.port,
-        pst: cmp.preset,
-        ofs: cmp.offset,
-        fun: cmp.functionType
-      }))
+      timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
+      counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
+      comparers: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
     };
 
     return {

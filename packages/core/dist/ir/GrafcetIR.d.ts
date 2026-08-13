@@ -6,6 +6,10 @@ export interface ActionNode {
     resourceType: ResourceType;
     channel: number;
     description?: string;
+    preset?: number;
+    offset?: number;
+    functionType?: number;
+    port?: number;
     type?: string;
     target?: string;
 }

@@ -22,7 +22,11 @@ function buildGrafcetIR(stepsList) {
         channel: channel,
         target: target,
         type: qualifier,
-        description: a.description || ''
+        description: a.description || '',
+        functionType: a.functionType,
+        preset: a.preset,
+        offset: a.offset,
+        port: a.port
       };
     });
 
@@ -125,11 +129,99 @@ function generateUserver03(ir) {
     });
   });
 
+  // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
+  const timersMap = new Map();
+  const countersMap = new Map();
+  const comparersMap = new Map();
+
+  (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
+  (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
+  (ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+
+  ir.steps.forEach((s) => {
+    (s.actions || []).forEach((a) => {
+      let resourceType = (a.resourceType || '').toUpperCase();
+      let channel = Number(a.channel);
+
+      if ((!resourceType || isNaN(channel)) && a.target) {
+        const match = a.target.match(/^([a-zA-Z]+)(\d+)$/);
+        if (match) {
+          resourceType = match[1].toUpperCase();
+          channel = parseInt(match[2], 10);
+        }
+      }
+
+      if (resourceType === 'T' && !isNaN(channel)) {
+        if (!timersMap.has(channel) || a.preset !== undefined) {
+          timersMap.set(channel, {
+            id: channel,
+            fun: a.functionType ?? 1,
+            pst: a.preset ?? 5,
+            ofs: a.offset ?? 0
+          });
+        }
+      } else if (resourceType === 'C' && !isNaN(channel)) {
+        if (!countersMap.has(channel) || a.preset !== undefined) {
+          countersMap.set(channel, {
+            id: channel,
+            fun: a.functionType ?? 1,
+            pst: a.preset ?? 5,
+            ofs: a.offset ?? 0
+          });
+        }
+      } else if (resourceType === 'A' && !isNaN(channel)) {
+        if (!comparersMap.has(channel) || a.preset !== undefined) {
+          comparersMap.set(channel, {
+            id: channel,
+            prt: a.port ?? 1,
+            fun: a.functionType ?? 2,
+            pst: a.preset ?? 2.15,
+            ofs: a.offset ?? 0
+          });
+        }
+      }
+    });
+  });
+
+  (ir.transitions || []).forEach((t) => {
+    if (t.receptivity) {
+      const timerMatches = t.receptivity.match(/\bT(\d+)\b/gi);
+      if (timerMatches) {
+        timerMatches.forEach((m) => {
+          const id = parseInt(m.substring(1), 10);
+          if (!isNaN(id) && !timersMap.has(id)) {
+            timersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+          }
+        });
+      }
+
+      const counterMatches = t.receptivity.match(/\bC(\d+)\b/gi);
+      if (counterMatches) {
+        counterMatches.forEach((m) => {
+          const id = parseInt(m.substring(1), 10);
+          if (!isNaN(id) && !countersMap.has(id)) {
+            countersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+          }
+        });
+      }
+
+      const comparerMatches = t.receptivity.match(/\bA(\d+)\b/gi);
+      if (comparerMatches) {
+        comparerMatches.forEach((m) => {
+          const id = parseInt(m.substring(1), 10);
+          if (!isNaN(id) && !comparersMap.has(id)) {
+            comparersMap.set(id, { id: id, prt: 1, fun: 2, pst: 2.15, ofs: 0 });
+          }
+        });
+      }
+    }
+  });
+
   const configObj = {
     lines: lines,
-    timers: ir.timers || [],
-    counters: ir.counters || [],
-    comparers: ir.comparers || []
+    timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
+    counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
+    comparers: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
   };
 
   return {

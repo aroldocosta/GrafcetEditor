@@ -460,12 +460,30 @@ function updateStepsView() {
 
         box.style.cursor = "pointer";
 
-        // Clique esquerdo na ação para abrir o modal de edição
+        // Clique esquerdo na ação para abrir o modal correspondente
         box.addEventListener("click", (e) => {
           e.stopPropagation();
           const tooltip = canvas.querySelector(".action-tooltip");
           if (tooltip) tooltip.remove();
-          showActionsModal(step);
+
+          const rType = r.toUpperCase();
+          if (['T', 'C', 'A'].includes(rType)) {
+            // Abrir diretamente o modal de parâmetros para T, C ou A
+            showResourceConfigModal({
+              resourceType: rType,
+              channel: parseInt(c, 10) || 1,
+              functionType: action.functionType,
+              preset: action.preset,
+              offset: action.offset,
+              port: action.port
+            }, (savedParams) => {
+              Object.assign(action, savedParams);
+              console.log(`Parâmetros de ${rType}${c} salvos via clique no canvas:`, savedParams);
+            });
+          } else {
+            // Para relés Q e memórias M, abre o modal de ações do Step
+            showActionsModal(step);
+          }
         });
 
         // Tooltip ao passar o mouse
@@ -630,29 +648,64 @@ function showActionsModal(step) {
       <!-- 5. Descrição (Totalmente Alinhada, sem margem inferior, mesma altura 32px) -->
       <input type="text" class="action-description" placeholder="Descrição da Ação" value="${action.description || ''}" style="height: 32px; flex: 1; margin: 0 !important; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
 
+      <!-- 6. Botão de Parâmetros de Recursos T, C, A -->
+      <button class="btn-config-param" title="Configurar Parâmetros (fun, pst, ofs)" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; display: ${['T','C','A'].includes(resourceType) ? 'inline-flex' : 'none'}; align-items: center; justify-content: center; vertical-align: middle;">⚙️</button>
+
       <button class="remove-action" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">X</button>
     `;
 
-    // Atualizar preview dinamicamente ao alterar os selects
+    // Dados mutáveis da ação para guardar parâmetros de T, C, A
+    const actionData = {
+      functionType: action.functionType,
+      preset: action.preset,
+      offset: action.offset,
+      port: action.port
+    };
+
+    // Atualizar preview e visibilidade do botão ⚙️ ao alterar os selects
     const qSelect = div.querySelector(".action-qualifier");
     const rSelect = div.querySelector(".action-resource");
     const cSelect = div.querySelector(".action-channel");
     const preview = div.querySelector(".action-preview");
+    const btnParam = div.querySelector(".btn-config-param");
 
     function updatePreview() {
       const q = qSelect.value;
       const r = rSelect.value;
       const c = cSelect.value || 1;
       preview.textContent = `${q}${r}${c}`;
+
+      if (['T', 'C', 'A'].includes(r)) {
+        btnParam.style.display = "inline-flex";
+      } else {
+        btnParam.style.display = "none";
+      }
     }
 
     qSelect.addEventListener("change", updatePreview);
     rSelect.addEventListener("change", updatePreview);
     cSelect.addEventListener("change", updatePreview);
 
+    btnParam.addEventListener("click", () => {
+      showResourceConfigModal({
+        resourceType: rSelect.value,
+        channel: parseInt(cSelect.value, 10) || 1,
+        functionType: actionData.functionType,
+        preset: actionData.preset,
+        offset: actionData.offset,
+        port: actionData.port
+      }, (savedParams) => {
+        Object.assign(actionData, savedParams);
+        console.log(`Parâmetros de ${rSelect.value}${cSelect.value} salvos:`, actionData);
+      });
+    });
+
     div.querySelector(".remove-action").addEventListener("click", () => {
       actionsContainer.removeChild(div);
     });
+
+    // Anexar objeto de dados ao elemento div para leitura ao salvar
+    div._actionData = actionData;
 
     actionsContainer.appendChild(div);
   }
@@ -676,6 +729,7 @@ function showActionsModal(step) {
       const c = parseInt(div.querySelector(".action-channel").value, 10) || 1;
       const desc = div.querySelector(".action-description").value.trim();
 
+      const extraData = div._actionData || {};
       return {
         id: index + 1,
         qualifier: q,
@@ -683,7 +737,11 @@ function showActionsModal(step) {
         channel: c,
         type: q,               // compatibilidade
         target: `${r}${c}`,   // ex: "Q3"
-        description: desc
+        description: desc,
+        functionType: extraData.functionType,
+        preset: extraData.preset,
+        offset: extraData.offset,
+        port: extraData.port
       };
     });
 
@@ -693,6 +751,87 @@ function showActionsModal(step) {
   });
 
   modal.querySelector("#cancel-actions").addEventListener("click", () => {
+    document.body.removeChild(overlay);
+  });
+}
+
+function showResourceConfigModal(actionData, onSave) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.style.zIndex = "10001";
+
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.style.minWidth = "360px";
+
+  const rType = (actionData.resourceType || 'T').toUpperCase();
+  const channel = actionData.channel || 1;
+
+  let title = `Configuração de Timer T${channel}`;
+  let portHTML = '';
+  if (rType === 'C') {
+    title = `Configuração de Contador C${channel}`;
+  } else if (rType === 'A') {
+    title = `Configuração de Comparador Analógico A${channel}`;
+    portHTML = `
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Porta (prt):</label>
+        <input type="number" id="param-port" value="${actionData.port ?? 1}" min="1" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+    `;
+  }
+
+  modal.innerHTML = `
+    <h2>${title}</h2>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">ID (Canal):</label>
+      <input type="text" value="${channel}" disabled style="width:100%; height:32px; padding:4px 8px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:4px; box-sizing:border-box;">
+    </div>
+
+    ${portHTML}
+
+    <div style="margin-bottom:10px;">
+      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Função (fun):</label>
+      <input type="number" id="param-fun" value="${actionData.functionType ?? (rType === 'A' ? 2 : 1)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Preset (pst):</label>
+      <input type="number" step="any" id="param-pst" value="${actionData.preset ?? (rType === 'A' ? 2.15 : 5)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:15px;">
+      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Offset (ofs):</label>
+      <input type="number" step="any" id="param-ofs" value="${actionData.offset ?? 0}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+    </div>
+
+    <div style="text-align:right;">
+      <button id="save-resource-params" style="background:#2563eb; color:#fff; padding:6px 14px; border:none; border-radius:4px; cursor:pointer;">Salvar Parâmetros</button>
+      <button id="cancel-resource-params" style="margin-left:5px; padding:6px 14px;">Cancelar</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  modal.querySelector("#save-resource-params").addEventListener("click", () => {
+    const fun = parseFloat(modal.querySelector("#param-fun").value) || 0;
+    const pst = parseFloat(modal.querySelector("#param-pst").value) || 0;
+    const ofs = parseFloat(modal.querySelector("#param-ofs").value) || 0;
+    const portEl = modal.querySelector("#param-port");
+    const prt = portEl ? (parseInt(portEl.value, 10) || 1) : undefined;
+
+    onSave({
+      functionType: fun,
+      preset: pst,
+      offset: ofs,
+      port: prt
+    });
+
+    document.body.removeChild(overlay);
+  });
+
+  modal.querySelector("#cancel-resource-params").addEventListener("click", () => {
     document.body.removeChild(overlay);
   });
 }
