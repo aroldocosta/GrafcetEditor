@@ -588,21 +588,57 @@ function showReceptivityModal(transition, transitionBar) {
 
   const modal = document.createElement("div");
   modal.className = "modal";
-  modal.style.minWidth = "460px";
-  modal.style.maxWidth = "520px";
+  modal.style.minWidth = "640px";
+  modal.style.maxWidth = "680px";
 
-  const makeChips = (items, isOp = false) => items.map(it => 
-    `<button type="button" class="chip-btn ${isOp ? 'op-chip' : ''}" data-val="${it}">${it}</button>`
-  ).join('');
+  // Função helper para criar o grupo de 4 chips + dropdown "Outros..."
+  const makeResourceGroup = (title, prefix, maxQty) => {
+    const visibleChips = [1, 2, 3, 4]
+      .filter(n => n <= maxQty)
+      .map(n => `<button type="button" class="chip-btn" data-val="${prefix}${n}">${prefix}${n}</button>`)
+      .join('');
 
-  const opChips = makeChips(['*', '+', '!', '(', ')', '1', '0'], true);
-  const iChips = makeChips([1,2,3,4,5,6,7,8].map(n => `I${n}`));
-  const qChips = makeChips([1,2,3,4,5,6,7,8].map(n => `Q${n}`));
-  const rChips = makeChips([1,2,3,4,5,6,7,8].map(n => `R${n}`));
-  const mChips = makeChips([1,2,3,4,5,6,7,8,16,32,64].map(n => `M${n}`));
-  const tChips = makeChips([1,2,3,4,5,6,7,8,16].map(n => `T${n}`));
-  const cChips = makeChips([1,2,3,4,5,6,7,8].map(n => `C${n}`));
-  const aChips = makeChips([1,2,3,4,5,6,7,8].map(n => `A${n}`));
+    let selectHTML = '';
+    if (maxQty > 4) {
+      const options = [];
+      for (let i = 5; i <= maxQty; i++) {
+        options.push(`<option value="${prefix}${i}">${prefix}${i}</option>`);
+      }
+      selectHTML = `
+        <select class="chip-select" data-prefix="${prefix}">
+          <option value="" selected disabled>(${prefix}5..${prefix}${maxQty})</option>
+          ${options.join('')}
+        </select>
+      `;
+    }
+
+    return `
+      <div class="chip-group-box">
+        <div class="chip-group-label">${title}</div>
+        <div class="chip-row">
+          ${visibleChips}
+          ${selectHTML}
+        </div>
+      </div>
+    `;
+  };
+
+  const opChipsHTML = `
+    <div class="chip-group-box">
+      <div class="chip-group-label">Operadores & Constantes</div>
+      <div class="chip-row">
+        ${['*', '+', '!', '(', ')', '1', '0'].map(op => `<button type="button" class="chip-btn op-chip" data-val="${op}">${op}</button>`).join('')}
+      </div>
+    </div>
+  `;
+
+  const iGroupHTML = makeResourceGroup("Entradas Digitais (I)", "I", 8);
+  const qGroupHTML = makeResourceGroup("Relés / Saídas (Q)", "Q", 8);
+  const rGroupHTML = makeResourceGroup("Remotas (R)", "R", 8);
+  const tGroupHTML = makeResourceGroup("Temporizadores (T)", "T", 16);
+  const cGroupHTML = makeResourceGroup("Contadores (C)", "C", 8);
+  const mGroupHTML = makeResourceGroup("Memórias (M)", "M", 64);
+  const aGroupHTML = makeResourceGroup("Comparadores (A)", "A", 8);
 
   modal.innerHTML = `
     <h2 style="font-size:1.1rem; margin-bottom:10px;">Editar Receptividade da Transição ${transition.id || ''}</h2>
@@ -613,30 +649,15 @@ function showReceptivityModal(transition, transitionBar) {
     </div>
 
     <div style="font-size:0.8rem; font-weight:bold; color:#475569; margin-bottom:4px;">Atalhos Rápidos de Hardware e Operadores:</div>
-    <div class="chip-container">
-      <div class="chip-group-label">Operadores & Constantes</div>
-      ${opChips}
-      
-      <div class="chip-group-label">Entradas Digitais (I)</div>
-      ${iChips}
-      
-      <div class="chip-group-label">Relés / Saídas (Q)</div>
-      ${qChips}
-
-      <div class="chip-group-label">Remotas (R)</div>
-      ${rChips}
-      
-      <div class="chip-group-label">Memórias (M)</div>
-      ${mChips}
-
-      <div class="chip-group-label">Timers (T)</div>
-      ${tChips}
-
-      <div class="chip-group-label">Contadores (C)</div>
-      ${cChips}
-
-      <div class="chip-group-label">Comparadores (A)</div>
-      ${aChips}
+    <div class="chip-grid">
+      ${opChipsHTML}
+      ${iGroupHTML}
+      ${qGroupHTML}
+      ${rGroupHTML}
+      ${tGroupHTML}
+      ${cGroupHTML}
+      ${mGroupHTML}
+      ${aGroupHTML}
     </div>
 
     <div style="text-align:right;">
@@ -695,10 +716,22 @@ function showReceptivityModal(transition, transitionBar) {
   input.addEventListener("input", validateAndRenderFeedback);
   validateAndRenderFeedback();
 
+  // Escutador de clique nos chips de botão
   modal.querySelectorAll(".chip-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       insertAtCursor(btn.getAttribute("data-val"));
+    });
+  });
+
+  // Escutador de alteração nos selects dropdowns ("Mais...")
+  modal.querySelectorAll(".chip-select").forEach(sel => {
+    sel.addEventListener("change", (e) => {
+      const selectedVal = sel.value;
+      if (selectedVal) {
+        insertAtCursor(selectedVal);
+        sel.selectedIndex = 0; // Resetar dropdown para o cabeçalho "Mais..."
+      }
     });
   });
 
