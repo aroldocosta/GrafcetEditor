@@ -1059,20 +1059,6 @@ function doCompile() {
 // Executar a cada 200 ms
 setInterval(updateStepsView, 100);
 
-function testOpenReceptivityModal() {
-  const dummyTransition = new Transition({
-    id: 1,
-    triggered: false,
-    receptivity: 'I1 * T1 + !Q2',
-    inputSteps: [1],
-    outputSteps: [2],
-    description: 'Teste de Receptividade'
-  });
-  const dummyBar = document.createElement("div");
-  dummyBar.innerHTML = '<span class="receptivity-label">I1 * T1 + !Q2</span>';
-  showReceptivityModal(dummyTransition, dummyBar);
-}
-
 /* ==========================================================================
    Funções de Persistência (localStorage, Auto-Save, Export / Import JSON)
    ========================================================================== */

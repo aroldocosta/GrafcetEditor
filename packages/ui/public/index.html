@@ -27,11 +27,10 @@
       <div class="connector top active"></div>
       <div class="connector bottom active"></div>
     </div>
-    <button onclick="doCompile()">COPILAR</button>
-    <button onclick="testOpenReceptivityModal()">RECEPTIVIDADE</button>
-    <button onclick="exportDiagram()" style="margin-top: 5px; background: #0284c7; color: white;">EXPORTAR JSON</button>
-    <button onclick="triggerImportDiagram()" style="margin-top: 5px; background: #0d9488; color: white;">IMPORTAR JSON</button>
-    <button onclick="clearDiagram()" style="margin-top: 5px; background: #ef4444; color: white;">LIMPAR DIAGRAMA</button>
+    <button class="palette-btn btn-compile" onclick="doCompile()">COMPILAR</button>
+    <button class="palette-btn btn-export" onclick="exportDiagram()">EXPORTAR JSON</button>
+    <button class="palette-btn btn-import" onclick="triggerImportDiagram()">IMPORTAR JSON</button>
+    <button class="palette-btn btn-clear" onclick="clearDiagram()">LIMPAR DIAGRAMA</button>
     <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
   </div>
 
