@@ -304,6 +304,8 @@
     left: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
+    z-index: 2;
   }
   
   svg polyline {
@@ -339,12 +341,14 @@
     white-space: nowrap;
   }
   
-    /* Linha que liga o Step à ação */
+  /* Linha que liga o Step à ação */
   .action-line {
     position: absolute;
     width: 20px;
     height: 2px;
     background: grey;
+    pointer-events: none;
+    z-index: 3;
   }
 
   /* Retângulo da ação */
@@ -357,9 +361,11 @@
     align-items: center;
     font-size: 12px;
     white-space: nowrap;
-    cursor: default;
+    cursor: pointer;
     width: var(--active_side);
-    height: var(--active_side)
+    height: var(--active_side);
+    z-index: 10;
+    user-select: none;
   }
 
   /* Tooltip customizado */

@@ -38,6 +38,21 @@ palette.querySelectorAll(".box").forEach(box => {
 
 canvas.addEventListener("dragover", e => e.preventDefault());
 
+canvas.addEventListener("click", e => {
+  const actionBox = e.target.closest(".action-box");
+  if (actionBox) {
+    e.stopPropagation();
+    const tooltip = canvas.querySelector(".action-tooltip");
+    if (tooltip) tooltip.remove();
+
+    const stepId = actionBox.getAttribute("data-step-id");
+    const targetStep = actionBox._step || stepsList.find(s => s.id == stepId || parseInt(s.id, 10) === parseInt(stepId, 10));
+    if (targetStep) {
+      showActionsModal(targetStep);
+    }
+  }
+});
+
 canvas.addEventListener("drop", e => {
   e.preventDefault();
   const type = e.dataTransfer.getData("type");
@@ -473,38 +488,27 @@ function updateStepsView() {
         const c = action.channel || (action.target ? action.target.replace(/\D+/g, '') : 1);
         const coilLabel = action.target ? `${q}${action.target}` : `${q}${r}${c}`;
 
-        const commandsText = (action.commands && Array.isArray(action.commands))
+        const commandsText = (action.commands && Array.isArray(action.commands) && action.commands.length > 0)
           ? action.commands.join(", ")
           : coilLabel;
 
         box.textContent = commandsText;
-
+        box.setAttribute("data-step-id", step.id);
+        box._step = step;
         box.style.cursor = "pointer";
+        box.style.zIndex = "10";
+        box.style.pointerEvents = "auto";
 
-        // Clique esquerdo na ação para abrir o modal correspondente
+        box.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+        });
+
+        // Clique em qualquer quadro de ação abre o modal de edição de ações do Step
         box.addEventListener("click", (e) => {
           e.stopPropagation();
           const tooltip = canvas.querySelector(".action-tooltip");
           if (tooltip) tooltip.remove();
-
-          const rType = r.toUpperCase();
-          if (['T', 'C', 'A'].includes(rType)) {
-            // Abrir diretamente o modal de parâmetros para T, C ou A
-            showResourceConfigModal({
-              resourceType: rType,
-              channel: parseInt(c, 10) || 1,
-              functionType: action.functionType,
-              preset: action.preset,
-              offset: action.offset,
-              port: action.port
-            }, (savedParams) => {
-              Object.assign(action, savedParams);
-              console.log(`Parâmetros de ${rType}${c} salvos via clique no canvas:`, savedParams);
-            });
-          } else {
-            // Para relés Q e memórias M, abre o modal de ações do Step
-            showActionsModal(step);
-          }
+          showActionsModal(step);
         });
 
         // Tooltip ao passar o mouse
@@ -779,8 +783,10 @@ function showActionsModal(step) {
   modal.className = "modal";
   modal.style.minWidth = "520px";
 
+  const stepNumber = step.element ? (step.element.querySelector(".inner-rect")?.textContent || step.id) : step.id;
+
   modal.innerHTML = `
-    <h2>Ações do Step ${step.id}</h2>
+    <h2>Ações da Etapa ${stepNumber}</h2>
     <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">
       Sintaxe da Bobina: <code>{Qualificador}{Tipo}{Canal}</code> (Exemplo: <b>XQ3</b>, <b>SM5</b>, <b>ZQ2</b>)
     </p>
@@ -1099,7 +1105,7 @@ function saveDiagramToStorage() {
           resourceType: a.resourceType,
           channel: a.channel,
           target: a.target,
-          commands: a.commands ? [...a.commands] : [],
+          commands: (a.commands && a.commands.length > 0) ? [...a.commands] : undefined,
           description: a.description,
           functionType: a.functionType,
           preset: a.preset,
