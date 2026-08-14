@@ -79,19 +79,22 @@
   .chip-row {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 3px;
     flex-wrap: nowrap;
     width: 100%;
     box-sizing: border-box;
     overflow: hidden;
+    height: 26px;
   }
 
   .chip-btn {
     border: 1px solid #cbd5e1;
     background: #ffffff;
     color: #1e293b;
-    padding: 2px 5px;
+    padding: 0 5px;
     height: 26px;
+    line-height: 24px;
     border-radius: 4px;
     font-size: 0.78rem;
     font-family: monospace;
@@ -99,11 +102,13 @@
     cursor: pointer;
     transition: all 0.15s ease;
     user-select: none;
-    margin-right: 0 !important;
+    margin: 0 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-sizing: border-box;
+    vertical-align: middle;
   }
 
   .chip-btn:hover {
@@ -128,7 +133,9 @@
     font-size: 0.75rem;
     font-weight: bold;
     height: 26px;
-    padding: 2px 4px;
+    line-height: 24px;
+    margin: 0 !important;
+    padding: 0 4px;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
     background: #f1f5f9;
@@ -139,6 +146,8 @@
     box-sizing: border-box;
     text-overflow: ellipsis;
     white-space: nowrap;
+    vertical-align: middle;
+    display: block;
   }
 
   .chip-select:hover {
