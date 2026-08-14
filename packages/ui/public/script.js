@@ -44,10 +44,14 @@ canvas.addEventListener("drop", e => {
   const template = palette.querySelector(`.${type}`);
   if (!template) return;
 
+  const rect = canvas.getBoundingClientRect();
+  const left = e.clientX - rect.left - 50;
+  const top = e.clientY - rect.top - 45;
+
   const clone = template.cloneNode(true);
   clone.style.position = "absolute";
-  clone.style.left = e.offsetX - 50 + "px";
-  clone.style.top = e.offsetY - 45 + "px";
+  clone.style.left = left + "px";
+  clone.style.top = top + "px";
   clone.draggable = false;
 
   // Definir o state conforme o tipo
@@ -1342,5 +1346,88 @@ function handleImportFile(event) {
 }
 
 window.addEventListener("beforeunload", saveDiagramToStorage);
-setTimeout(loadDiagramFromStorage, 100);
+setTimeout(() => {
+  const loaded = loadDiagramFromStorage();
+  // Centraliza a visão inicial no meio do canvas de 4 folhas
+  centerCanvasViewport();
+}, 100);
+
+/* ==========================================================================
+   Navegação e Pan na Área de Trabalho (4 Folhas / Viewport)
+   ========================================================================== */
+
+const viewport = document.getElementById("canvas-viewport");
+
+function centerCanvasViewport() {
+  if (!viewport || !canvas) return;
+  const scrollLeft = (canvas.scrollWidth - viewport.clientWidth) / 2;
+  const scrollTop = (canvas.scrollHeight - viewport.clientHeight) / 2;
+  viewport.scrollTo({
+    left: scrollLeft,
+    top: scrollTop,
+    behavior: 'smooth'
+  });
+}
+
+// 1. Navegação via Clique e Arrasta (Pan Mode)
+let isPanning = false;
+let startX = 0;
+let startY = 0;
+let startScrollLeft = 0;
+let startScrollTop = 0;
+
+if (viewport) {
+  viewport.addEventListener("mousedown", e => {
+    // Permite Pan se for botão do meio (1), botão direito (2), ou clique no fundo do canvas
+    const isCanvasBg = e.target === canvas || e.target === viewport || e.target.classList.contains("quadrant-divider") || e.target.tagName.toLowerCase() === "svg";
+    const isPanButton = e.button === 1 || e.button === 2 || (e.button === 0 && isCanvasBg);
+
+    if (isPanButton) {
+      if (e.button === 2) e.preventDefault(); // Previne menu de contexto se botão direito
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startScrollLeft = viewport.scrollLeft;
+      startScrollTop = viewport.scrollTop;
+      viewport.classList.add("panning");
+    }
+  });
+
+  viewport.addEventListener("contextmenu", e => {
+    if (isPanning) e.preventDefault();
+  });
+
+  window.addEventListener("mousemove", e => {
+    if (!isPanning) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    viewport.scrollLeft = startScrollLeft - dx;
+    viewport.scrollTop = startScrollTop - dy;
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (isPanning) {
+      isPanning = false;
+      viewport.classList.remove("panning");
+    }
+  });
+}
+
+// 2. Botões de Navegação Flutuante (Setas e Centralizar)
+document.getElementById("nav-up")?.addEventListener("click", () => {
+  if (viewport) viewport.scrollBy({ top: -300, behavior: 'smooth' });
+});
+document.getElementById("nav-down")?.addEventListener("click", () => {
+  if (viewport) viewport.scrollBy({ top: 300, behavior: 'smooth' });
+});
+document.getElementById("nav-left")?.addEventListener("click", () => {
+  if (viewport) viewport.scrollBy({ left: -300, behavior: 'smooth' });
+});
+document.getElementById("nav-right")?.addEventListener("click", () => {
+  if (viewport) viewport.scrollBy({ left: 300, behavior: 'smooth' });
+});
+document.getElementById("nav-center")?.addEventListener("click", () => {
+  centerCanvasViewport();
+});
+
 

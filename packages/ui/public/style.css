@@ -173,11 +173,129 @@
     cursor: pointer;
   }
   
-  #canvas {
+  #canvas-viewport {
     flex: 1;
     position: relative;
-    background: #fefefe;
-    overflow: hidden;
+    overflow: auto;
+    background: #cbd5e1;
+    scroll-behavior: smooth;
+    user-select: none;
+  }
+
+  #canvas-viewport.panning {
+    cursor: grabbing !important;
+    scroll-behavior: auto !important;
+  }
+
+  #canvas {
+    width: 3200px;
+    height: 2400px;
+    min-width: 200%;
+    min-height: 200%;
+    position: relative;
+    background: #ffffff;
+    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Divisores de Folhas (Quadrantes 2x2) */
+  .quadrant-divider {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.35;
+  }
+
+  .quadrant-divider.vertical {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    border-left: 1.5px dashed #94a3b8;
+  }
+
+  .quadrant-divider.horizontal {
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    border-top: 1.5px dashed #94a3b8;
+  }
+
+  .sheet-label {
+    position: absolute;
+    font-size: 12px;
+    font-weight: bold;
+    color: #94a3b8;
+    padding: 3px 8px;
+    background: rgba(248, 250, 252, 0.6);
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.6;
+  }
+
+  .sheet-label.sheet-1 { top: 15px; left: 15px; }
+  .sheet-label.sheet-2 { top: 15px; right: 15px; }
+  .sheet-label.sheet-3 { bottom: 15px; left: 15px; }
+  .sheet-label.sheet-4 { bottom: 15px; right: 15px; }
+
+  /* Controles Flutuantes de Navegação */
+  #nav-controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+  }
+
+  .nav-row {
+    display: flex;
+    gap: 4px;
+  }
+
+  .nav-btn {
+    width: 34px;
+    height: 34px;
+    margin: 0 !important;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .nav-btn:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+    border-color: #93c5fd;
+    transform: scale(1.05);
+  }
+
+  .nav-btn:active {
+    transform: scale(0.95);
+  }
+
+  #nav-center {
+    background: #eff6ff;
+    color: #2563eb;
+    border-color: #bfdbfe;
   }
   
   svg {

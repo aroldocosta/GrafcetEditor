@@ -34,7 +34,27 @@
     <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
   </div>
 
-  <div id="canvas"></div>
+  <div id="canvas-viewport">
+    <div id="canvas">
+      <div class="quadrant-divider vertical"></div>
+      <div class="quadrant-divider horizontal"></div>
+      <span class="sheet-label sheet-1">Folha 1</span>
+      <span class="sheet-label sheet-2">Folha 2</span>
+      <span class="sheet-label sheet-3">Folha 3</span>
+      <span class="sheet-label sheet-4">Folha 4</span>
+    </div>
+
+    <!-- Controles de Navegação Flutuantes -->
+    <div id="nav-controls">
+      <button class="nav-btn" id="nav-up" title="Mover para Cima">▲</button>
+      <div class="nav-row">
+        <button class="nav-btn" id="nav-left" title="Mover para Esquerda">◄</button>
+        <button class="nav-btn" id="nav-center" title="Centralizar Visão">🎯</button>
+        <button class="nav-btn" id="nav-right" title="Mover para Direita">►</button>
+      </div>
+      <button class="nav-btn" id="nav-down" title="Mover para Baixo">▼</button>
+    </div>
+  </div>
 
   <script src="step.js"></script>
   <script src="transition.js"></script>

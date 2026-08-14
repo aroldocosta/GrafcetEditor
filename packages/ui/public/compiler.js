@@ -217,6 +217,10 @@ function generateUserver03(ir) {
     }
   });
 
+  if (lines.length > 0) {
+    lines[lines.length - 1] += ';';
+  }
+
   const configObj = {
     lines: lines,
     timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),

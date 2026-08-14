@@ -23,7 +23,7 @@ describe('Userver03Generator', () => {
       'SM2=M1*I1',
       'RM1=M1*I1',
       'SQ1=M2',
-      'RQ1=!M2'
+      'RQ1=!M2;'
     ]);
   });
 
@@ -47,7 +47,7 @@ describe('Userver03Generator', () => {
 
     expect(parsed.lines).toEqual([
       'SM5=M2',
-      'ZQ2=M2'
+      'ZQ2=M2;'
     ]);
   });
 
@@ -66,7 +66,7 @@ describe('Userver03Generator', () => {
     const parsed = JSON.parse(output.content);
 
     expect(parsed.lines[0]).toBe('SM2=M1*I1*!I2');
-    expect(parsed.lines[1]).toBe('RM1=M1*I1*!I2');
+    expect(parsed.lines[1]).toBe('RM1=M1*I1*!I2;');
   });
 
   it('deve suportar divergência em E (ativação paralela de etapas)', () => {
@@ -87,7 +87,7 @@ describe('Userver03Generator', () => {
     expect(parsed.lines).toEqual([
       'SM2=M1*I1',
       'SM3=M1*I1',
-      'RM1=M1*I1'
+      'RM1=M1*I1;'
     ]);
   });
 

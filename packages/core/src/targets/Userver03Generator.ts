@@ -178,6 +178,11 @@ export class Userver03Generator implements ICodeGenerator {
       }
     }
 
+    // Adicionar ponto e vírgula na última linha do script para marcar o fim do loop do interpretador
+    if (lines.length > 0) {
+      lines[lines.length - 1] += ';';
+    }
+
     // 4. Montar a estrutura final do JSON do userver03 (/code_param.cfg)
     const jsonOutput = {
       lines: lines,
