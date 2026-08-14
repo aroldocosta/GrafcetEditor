@@ -428,9 +428,16 @@ function updateStepsView() {
 
       step.actions.forEach((action, idx) => {
         if (idx === 0) { // Primeira ação (conecta a linha ao Step)
+          const innerRect = step.element.querySelector(".inner-rect");
+          const stepLeft = parseFloat(step.element.style.left);
+          const innerRightX = stepLeft + innerRect.offsetLeft + innerRect.offsetWidth;
+          const actionBoxLeft = baseLeft - 10; // X onde a caixa da ação começa
+          const lineWidth = Math.max(0, actionBoxLeft - innerRightX);
+
           const line = document.createElement("div");
           line.className = "action-line";
-          line.style.left = (baseLeft - 30) + "px";
+          line.style.left = innerRightX + "px";
+          line.style.width = lineWidth + "px";
           line.style.top = (baseTop + 20) + "px";
           canvas.appendChild(line);
         }
@@ -524,27 +531,182 @@ function updateStepsView() {
   });
 }
 
+function validateReceptivityJS(expr) {
+  if (!expr || expr.trim() === '') return { isValid: true, normalized: '1', errors: [] };
+  
+  const normalized = expr
+    .replace(/\s+/g, '')
+    .replace(/AND/gi, '*')
+    .replace(/&&/g, '*')
+    .replace(/OR/gi, '+')
+    .replace(/\|\|/g, '+')
+    .replace(/NOT/gi, '!')
+    .replace(/~/g, '!');
+
+  const hwPattern = /^(I[1-8]|E[1-8]|Q[1-8]|R[1-8]|M([1-9]|[1-5][0-9]|6[0-4])|X([1-9]|[1-5][0-9]|6[0-4])|T([1-9]|1[0-6])|C[1-8]|A[1-8]|1|0)$/i;
+
+  const rawTokens = normalized.match(/([a-zA-Z]+\d+|\d+|[+*!()])/g) || [];
+  const fullReconstructed = rawTokens.join('');
+  const errors = [];
+
+  if (fullReconstructed !== normalized) {
+    errors.push('Símbolo inválido detectado na expressão.');
+  }
+
+  for (const tok of rawTokens) {
+    if (!/^[+*!()]$/.test(tok)) {
+      if (!hwPattern.test(tok)) {
+        errors.push(`Identificador '${tok}' fora dos limites de hardware (I1-I8, Q1-Q8, R1-R8, M1-M64, T1-T16, C1-C8, A1-A8, 1, 0).`);
+      }
+    }
+  }
+
+  let parenDepth = 0;
+  for (const tok of rawTokens) {
+    if (tok === '(') parenDepth++;
+    if (tok === ')') parenDepth--;
+    if (parenDepth < 0) { errors.push("Parêntese ')' sem abertura '(' correspondente."); break; }
+  }
+  if (parenDepth > 0) errors.push(`Há ${parenDepth} parêntese(s) '(' não fechados.`);
+
+  for (let i = 0; i < rawTokens.length - 1; i++) {
+    if (/^[+*]$/.test(rawTokens[i]) && /^[+*]$/.test(rawTokens[i+1])) {
+      errors.push(`Operadores duplos consecutivos: '${rawTokens[i]}${rawTokens[i+1]}'.`);
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    normalized: normalized,
+    errors: errors
+  };
+}
+
 function showReceptivityModal(transition, transitionBar) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
 
   const modal = document.createElement("div");
   modal.className = "modal";
+  modal.style.minWidth = "460px";
+  modal.style.maxWidth = "520px";
+
+  const makeChips = (items, isOp = false) => items.map(it => 
+    `<button type="button" class="chip-btn ${isOp ? 'op-chip' : ''}" data-val="${it}">${it}</button>`
+  ).join('');
+
+  const opChips = makeChips(['*', '+', '!', '(', ')', '1', '0'], true);
+  const iChips = makeChips([1,2,3,4,5,6,7,8].map(n => `I${n}`));
+  const qChips = makeChips([1,2,3,4,5,6,7,8].map(n => `Q${n}`));
+  const rChips = makeChips([1,2,3,4,5,6,7,8].map(n => `R${n}`));
+  const mChips = makeChips([1,2,3,4,5,6,7,8,16,32,64].map(n => `M${n}`));
+  const tChips = makeChips([1,2,3,4,5,6,7,8,16].map(n => `T${n}`));
+  const cChips = makeChips([1,2,3,4,5,6,7,8].map(n => `C${n}`));
+  const aChips = makeChips([1,2,3,4,5,6,7,8].map(n => `A${n}`));
 
   modal.innerHTML = `
-    <h2>Editar Receptividade</h2>
-    <input type="text" id="receptivity-input" placeholder="Digite a receptividade" value="${transition.receptivity}">
+    <h2 style="font-size:1.1rem; margin-bottom:10px;">Editar Receptividade da Transição ${transition.id || ''}</h2>
+    <input type="text" id="receptivity-input" placeholder="Ex: I1 * T1 + !Q2" value="${transition.receptivity || ''}" style="font-family:monospace; font-weight:bold; font-size:1rem; height:38px; box-sizing:border-box;">
+    
+    <div id="receptivity-feedback" style="margin-top:6px; margin-bottom:10px; font-size:0.85rem; padding:6px 10px; border-radius:4px; border:1px solid #cbd5e1; background:#f8fafc;">
+      Digite a expressão booleana ou clique nos botões abaixo
+    </div>
+
+    <div style="font-size:0.8rem; font-weight:bold; color:#475569; margin-bottom:4px;">Atalhos Rápidos de Hardware e Operadores:</div>
+    <div class="chip-container">
+      <div class="chip-group-label">Operadores & Constantes</div>
+      ${opChips}
+      
+      <div class="chip-group-label">Entradas Digitais (I)</div>
+      ${iChips}
+      
+      <div class="chip-group-label">Relés / Saídas (Q)</div>
+      ${qChips}
+
+      <div class="chip-group-label">Remotas (R)</div>
+      ${rChips}
+      
+      <div class="chip-group-label">Memórias (M)</div>
+      ${mChips}
+
+      <div class="chip-group-label">Timers (T)</div>
+      ${tChips}
+
+      <div class="chip-group-label">Contadores (C)</div>
+      ${cChips}
+
+      <div class="chip-group-label">Comparadores (A)</div>
+      ${aChips}
+    </div>
+
     <div style="text-align:right;">
-      <button id="save-receptivity">Salvar</button>
-      <button id="cancel-receptivity">Cancelar</button>
+      <button id="save-receptivity" style="background:#2563eb; color:#fff; padding:6px 16px; border:none; border-radius:4px; cursor:pointer;">Salvar Receptividade</button>
+      <button id="cancel-receptivity" style="padding:6px 14px;">Cancelar</button>
     </div>
   `;
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  modal.querySelector("#save-receptivity").addEventListener("click", () => {
-    const value = modal.querySelector("#receptivity-input").value.trim();
+  const input = modal.querySelector("#receptivity-input");
+  const feedback = modal.querySelector("#receptivity-feedback");
+  const saveBtn = modal.querySelector("#save-receptivity");
+
+  function insertAtCursor(textToInsert) {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    const val = input.value;
+    
+    const needSpaceBefore = /^[+*]$/.test(textToInsert) && start > 0 && val[start-1] !== ' ';
+    const needSpaceAfter = /^[+*]$/.test(textToInsert);
+
+    const formattedInsert = (needSpaceBefore ? ' ' : '') + textToInsert + (needSpaceAfter ? ' ' : '');
+    input.value = val.substring(0, start) + formattedInsert + val.substring(end);
+    
+    const newPos = start + formattedInsert.length;
+    input.setSelectionRange(newPos, newPos);
+    input.focus();
+    validateAndRenderFeedback();
+  }
+
+  function validateAndRenderFeedback() {
+    const val = input.value;
+    const res = validateReceptivityJS(val);
+
+    if (res.isValid) {
+      feedback.style.background = "#dcfce7";
+      feedback.style.color = "#15803d";
+      feedback.style.border = "1px solid #86efac";
+      feedback.innerHTML = `✓ <strong>Sintaxe Válida:</strong> <code style="font-family:monospace; font-weight:bold;">${res.normalized || '1'}</code>`;
+      saveBtn.disabled = false;
+      saveBtn.style.opacity = "1";
+      saveBtn.style.cursor = "pointer";
+    } else {
+      feedback.style.background = "#fee2e2";
+      feedback.style.color = "#b91c1c";
+      feedback.style.border = "1px solid #fca5a5";
+      feedback.innerHTML = `⚠️ <strong>Erro:</strong> ${res.errors[0]}`;
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = "0.5";
+      saveBtn.style.cursor = "not-allowed";
+    }
+  }
+
+  input.addEventListener("input", validateAndRenderFeedback);
+  validateAndRenderFeedback();
+
+  modal.querySelectorAll(".chip-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      insertAtCursor(btn.getAttribute("data-val"));
+    });
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const res = validateReceptivityJS(input.value);
+    if (!res.isValid) return;
+
+    const value = res.normalized || '1';
     transition.setReceptivity(value);
 
     const label = transitionBar.querySelector(".receptivity-label");
@@ -553,7 +715,7 @@ function showReceptivityModal(transition, transitionBar) {
     }
 
     document.body.removeChild(overlay);
-    console.log(`Receptividade da transição ${transition.id} atualizada para: "${value}"`);
+    console.log(`Receptividade da transição ${transition.id} salva: "${value}"`);
   });
 
   modal.querySelector("#cancel-receptivity").addEventListener("click", () => {
@@ -850,3 +1012,17 @@ function doCompile() {
 
 // Executar a cada 200 ms
 setInterval(updateStepsView, 100);
+
+function testOpenReceptivityModal() {
+  const dummyTransition = new Transition({
+    id: 1,
+    triggered: false,
+    receptivity: 'I1 * T1 + !Q2',
+    inputSteps: [1],
+    outputSteps: [2],
+    description: 'Teste de Receptividade'
+  });
+  const dummyBar = document.createElement("div");
+  dummyBar.innerHTML = '<span class="receptivity-label">I1 * T1 + !Q2</span>';
+  showReceptivityModal(dummyTransition, dummyBar);
+}

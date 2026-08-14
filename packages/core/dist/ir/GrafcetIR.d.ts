@@ -1,5 +1,5 @@
 export type CoilQualifier = 'X' | 'P' | 'N' | 'S' | 'R' | 'Z' | 'T';
-export type ResourceType = 'Q' | 'M' | 'T' | 'C' | 'A' | 'R';
+export type ResourceType = 'Q' | 'M' | 'T' | 'C' | 'A' | 'R' | 'I';
 export interface ActionNode {
     id?: number | string;
     qualifier: CoilQualifier;
