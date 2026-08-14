@@ -8,6 +8,9 @@ let transitionCounter = 0;
 let boxCounter = 0;
 let clickTimeout = null;
 
+const STORAGE_KEY = "grafcet_saved_diagram";
+let saveTimeout = null;
+
 palette.querySelectorAll(".box").forEach(box => {
   box.addEventListener("dragstart", e => {
     // Centralizar cursor no centro do objeto na paleta usando setDragImage
@@ -72,6 +75,7 @@ canvas.addEventListener("drop", e => {
   clone.setAttribute("data-id", step.id);
 
   printSteps();
+  debouncedSaveDiagram();
 });
 
 function makeDraggable(box) {
@@ -102,6 +106,9 @@ function makeDraggable(box) {
       document.removeEventListener("mouseup", up);
       // Quando soltar, marca na propriedade dataset se moveu
       box.dataset.wasMoved = moved ? "true" : "false";
+      if (moved) {
+        debouncedSaveDiagram();
+      }
     }
 
     document.addEventListener("mousemove", move);
@@ -153,6 +160,7 @@ function attachConnectorListeners(box) {
             removeStepConnection(connRemoved);
             connections.splice(index, 1);
             printSteps();
+            debouncedSaveDiagram();
           }
         });
 
@@ -213,6 +221,7 @@ function attachConnectorListeners(box) {
         currentConnection = null;
 
         printSteps();
+        debouncedSaveDiagram();
       }
     });
   });
@@ -313,6 +322,7 @@ function attachRemoveListener(box) {
 
     renumberBoxes();
     printSteps();
+    debouncedSaveDiagram();
   });
 }
 
@@ -749,6 +759,7 @@ function showReceptivityModal(transition, transitionBar) {
 
     document.body.removeChild(overlay);
     console.log(`Receptividade da transição ${transition.id} salva: "${value}"`);
+    debouncedSaveDiagram();
   });
 
   modal.querySelector("#cancel-receptivity").addEventListener("click", () => {
@@ -943,6 +954,7 @@ function showActionsModal(step) {
     step.actions = newActions;
     document.body.removeChild(overlay);
     console.log(`Step ${step.id} - ${newActions.length} ações salvas:`, newActions);
+    debouncedSaveDiagram();
   });
 
   modal.querySelector("#cancel-actions").addEventListener("click", () => {
@@ -1024,6 +1036,7 @@ function showResourceConfigModal(actionData, onSave) {
     });
 
     document.body.removeChild(overlay);
+    debouncedSaveDiagram();
   });
 
   modal.querySelector("#cancel-resource-params").addEventListener("click", () => {
@@ -1059,3 +1072,289 @@ function testOpenReceptivityModal() {
   dummyBar.innerHTML = '<span class="receptivity-label">I1 * T1 + !Q2</span>';
   showReceptivityModal(dummyTransition, dummyBar);
 }
+
+/* ==========================================================================
+   Funções de Persistência (localStorage, Auto-Save, Export / Import JSON)
+   ========================================================================== */
+
+function saveDiagramToStorage() {
+  try {
+    const data = {
+      version: 1,
+      timestamp: Date.now(),
+      counters: {
+        boxCounter,
+        transitionCounter
+      },
+      steps: stepsList.map(step => ({
+        id: step.id,
+        type: step.type,
+        state: step.state,
+        position: {
+          left: step.element.style.left,
+          top: step.element.style.top
+        },
+        inputs: [...step.inputs],
+        outputs: [...step.outputs],
+        transitions: (step.transitions || []).map(t => ({
+          id: t.id,
+          triggered: t.triggered,
+          receptivity: t.receptivity,
+          description: t.description
+        })),
+        actions: (step.actions || []).map(a => ({
+          id: a.id,
+          type: a.type,
+          qualifier: a.qualifier,
+          resourceType: a.resourceType,
+          channel: a.channel,
+          target: a.target,
+          commands: a.commands ? [...a.commands] : [],
+          description: a.description,
+          functionType: a.functionType,
+          preset: a.preset,
+          offset: a.offset,
+          port: a.port
+        }))
+      })),
+      connections: connections.map(c => ({
+        fromStepId: parseInt(c.from.box.getAttribute("data-id")),
+        fromConnector: c.from.connector,
+        toStepId: parseInt(c.to.box.getAttribute("data-id")),
+        toConnector: c.to.connector
+      }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    console.log("Diagrama salvo com sucesso no localStorage.");
+  } catch (err) {
+    console.error("Erro ao salvar diagrama no localStorage:", err);
+  }
+}
+
+function debouncedSaveDiagram() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveDiagramToStorage, 300);
+}
+
+function clearCanvasDOM() {
+  const oldBoxes = canvas.querySelectorAll(".box");
+  oldBoxes.forEach(box => box.remove());
+
+  const svg = canvas.querySelector("svg");
+  if (svg) svg.remove();
+
+  const oldActionBoxes = canvas.querySelectorAll(".action-box, .action-line, .action-tooltip");
+  oldActionBoxes.forEach(el => el.remove());
+
+  stepsList.length = 0;
+  connections.length = 0;
+}
+
+function restoreDiagram(data) {
+  if (!data || !Array.isArray(data.steps)) return false;
+
+  clearCanvasDOM();
+
+  boxCounter = data.counters?.boxCounter || 0;
+  transitionCounter = data.counters?.transitionCounter || 0;
+
+  const svg = getOrCreateSVG();
+
+  // 1. Reconstruir steps
+  data.steps.forEach(sData => {
+    const template = palette.querySelector(`.${sData.type}`);
+    if (!template) return;
+
+    const clone = template.cloneNode(true);
+    clone.style.position = "absolute";
+    clone.style.left = sData.position?.left || "0px";
+    clone.style.top = sData.position?.top || "0px";
+    clone.draggable = false;
+
+    const state = sData.state || "inactive";
+    clone.setAttribute("data-state", state);
+    clone.setAttribute("data-id", sData.id);
+
+    const inner = clone.querySelector(".inner-rect");
+    if (state === "active") {
+      inner.style.border = sData.type === "start_step" ? "5px double darkblue" : "3px solid darkblue";
+    }
+
+    canvas.appendChild(clone);
+    makeDraggable(clone);
+    attachConnectorListeners(clone);
+    attachHoverListeners(clone);
+    attachRemoveListener(clone);
+
+    const step = new Step(sData.type, clone, state);
+    step.id = sData.id;
+    step.inputs = sData.inputs ? [...sData.inputs] : [];
+    step.outputs = sData.outputs ? [...sData.outputs] : [];
+
+    if (Array.isArray(sData.transitions)) {
+      step.transitions = sData.transitions.map(tData => new Transition({
+        id: tData.id,
+        triggered: tData.triggered,
+        receptivity: tData.receptivity,
+        description: tData.description
+      }));
+    }
+
+    if (Array.isArray(sData.actions)) {
+      step.actions = sData.actions.map(aData => new Action({
+        id: aData.id,
+        type: aData.type || aData.qualifier,
+        qualifier: aData.qualifier,
+        resourceType: aData.resourceType,
+        channel: aData.channel,
+        target: aData.target,
+        commands: aData.commands,
+        description: aData.description,
+        functionType: aData.functionType,
+        preset: aData.preset,
+        offset: aData.offset,
+        port: aData.port
+      }));
+    }
+
+    // Atualizar label da receptividade se houver
+    if (step.transitions && step.transitions.length > 0 && step.transitions[0].receptivity) {
+      const receptivityLabel = clone.querySelector(".receptivity-label");
+      if (receptivityLabel) {
+        receptivityLabel.textContent = step.transitions[0].receptivity;
+      }
+    }
+
+    stepsList.push(step);
+  });
+
+  renumberBoxes();
+
+  // 2. Reconstruir conexões
+  if (Array.isArray(data.connections)) {
+    data.connections.forEach(cData => {
+      const fromBox = canvas.querySelector(`.box[data-id="${cData.fromStepId}"]`);
+      const toBox = canvas.querySelector(`.box[data-id="${cData.toStepId}"]`);
+      if (!fromBox || !toBox) return;
+
+      const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      polyline.setAttribute("stroke", "lightblue");
+      polyline.setAttribute("stroke-width", "2");
+      polyline.setAttribute("fill", "none");
+
+      svg.appendChild(polyline);
+
+      polyline.addEventListener("mouseenter", () => {
+        polyline.classList.add("hover-highlight");
+        const conn = connections.find(c => c.polyline === polyline);
+        if (conn) {
+          conn.from.box.querySelector(".inner-rect")?.classList.add("hover-highlight");
+          conn.to?.box?.querySelector(".inner-rect")?.classList.add("hover-highlight");
+        }
+      });
+
+      polyline.addEventListener("mouseleave", () => {
+        polyline.classList.remove("hover-highlight");
+        const conn = connections.find(c => c.polyline === polyline);
+        if (conn) {
+          conn.from.box.querySelector(".inner-rect")?.classList.remove("hover-highlight");
+          conn.to?.box?.querySelector(".inner-rect")?.classList.remove("hover-highlight");
+        }
+      });
+
+      polyline.addEventListener("dblclick", e => {
+        e.stopPropagation();
+        svg.removeChild(polyline);
+        const index = connections.findIndex(c => c.polyline === polyline);
+        if (index !== -1) {
+          const connRemoved = connections[index];
+          removeStepConnection(connRemoved);
+          connections.splice(index, 1);
+          printSteps();
+          debouncedSaveDiagram();
+        }
+      });
+
+      const connObj = {
+        polyline,
+        from: { box: fromBox, connector: cData.fromConnector },
+        to: { box: toBox, connector: cData.toConnector }
+      };
+
+      connections.push(connObj);
+      updateConnections(fromBox);
+    });
+  }
+
+  updateStepsView();
+  return true;
+}
+
+function loadDiagramFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    return restoreDiagram(data);
+  } catch (err) {
+    console.error("Erro ao carregar diagrama do localStorage:", err);
+    return false;
+  }
+}
+
+function clearDiagram() {
+  if (confirm("Tem certeza que deseja limpar todo o diagrama? Essa ação não pode ser desfeita.")) {
+    clearCanvasDOM();
+    boxCounter = 0;
+    transitionCounter = 0;
+    localStorage.removeItem(STORAGE_KEY);
+    console.log("Diagrama limpo com sucesso.");
+  }
+}
+
+function exportDiagram() {
+  saveDiagramToStorage();
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    alert("Nenhum diagrama para exportar.");
+    return;
+  }
+  const blob = new Blob([raw], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `grafcet_diagram_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function triggerImportDiagram() {
+  const input = document.getElementById("import-file-input");
+  if (input) input.click();
+}
+
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (restoreDiagram(data)) {
+        saveDiagramToStorage();
+        alert("Diagrama importado com sucesso!");
+      } else {
+        alert("Arquivo JSON de diagrama inválido.");
+      }
+    } catch (err) {
+      alert("Erro ao ler o arquivo JSON: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = "";
+}
+
+window.addEventListener("beforeunload", saveDiagramToStorage);
+setTimeout(loadDiagramFromStorage, 100);
+
