@@ -44,6 +44,7 @@ export interface ComparerConfig {
     offset: number;
     functionType: number;
 }
+export type ComparatConfig = ComparerConfig;
 export interface GrafcetIR {
     name?: string;
     steps: StepNode[];
@@ -51,4 +52,5 @@ export interface GrafcetIR {
     timers?: TimerConfig[];
     counters?: CounterConfig[];
     comparers?: ComparerConfig[];
+    comparats?: ComparatConfig[];
 }

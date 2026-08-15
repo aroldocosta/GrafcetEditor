@@ -70,10 +70,10 @@ export class Userver03Generator {
         const timersMap = new Map();
         const countersMap = new Map();
         const comparersMap = new Map();
-        // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparers
+        // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparats
         (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
         (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
-        (ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+        (ir.comparats || ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
         // Varrer ações das etapas para incluir configurações de T, C, A definidos nas ações
         for (const step of ir.steps) {
             for (const action of step.actions) {
@@ -152,12 +152,16 @@ export class Userver03Generator {
                 }
             }
         }
+        // Adicionar ponto e vírgula na última linha do script para marcar o fim do loop do interpretador
+        if (lines.length > 0) {
+            lines[lines.length - 1] += ';';
+        }
         // 4. Montar a estrutura final do JSON do userver03 (/code_param.cfg)
         const jsonOutput = {
             lines: lines,
             timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
             counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
-            comparers: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
+            comparats: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
         };
         return {
             targetId: this.targetId,

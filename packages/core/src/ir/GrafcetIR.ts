@@ -54,6 +54,7 @@ export interface ComparerConfig {
   offset: number;
   functionType: number;
 }
+export type ComparatConfig = ComparerConfig;
 
 export interface GrafcetIR {
   name?: string;
@@ -62,4 +63,5 @@ export interface GrafcetIR {
   timers?: TimerConfig[];
   counters?: CounterConfig[];
   comparers?: ComparerConfig[];
+  comparats?: ComparatConfig[];
 }

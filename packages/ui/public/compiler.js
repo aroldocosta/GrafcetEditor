@@ -64,7 +64,7 @@ function buildGrafcetIR(stepsList) {
     transitions: transitions,
     timers: [],
     counters: [],
-    comparers: []
+    comparats: []
   };
 }
 
@@ -98,33 +98,42 @@ function generateUserver03(ir) {
     });
   });
 
-  // 2. Linhas de Ações
+  // 2. Ações Associadas às Etapas
   ir.steps.forEach((s) => {
-    const stepMarker = `M${s.id}`;
-    s.actions.forEach((a) => {
-      const target = a.target.toUpperCase();
-      switch (a.type) {
-        case 'X':
-        case 'P':
-        case 'N': // Sem Retenção (Normal)
-          lines.push(`S${target}=${stepMarker}`);
-          lines.push(`R${target}=!${stepMarker}`);
-          break;
-        case 'S': // Set (Ativa Retenção / Latch)
-          lines.push(`S${target}=${stepMarker}`);
-          break;
-        case 'R': // Reset (Desativa Retenção / Unlatch)
-          lines.push(`R${target}=${stepMarker}`);
-          break;
-        case 'Z': // Toggle (Inverte Estado)
-          lines.push(`Z${target}=${stepMarker}`);
-          break;
-        case 'T': // Ativação Temporizada
-          lines.push(`T${target}=${stepMarker}`);
-          break;
-        default:
-          lines.push(`S${target}=${stepMarker}`);
-          break;
+    (s.actions || []).forEach((a) => {
+      const q = (a.qualifier || 'X').toUpperCase();
+      let resourceType = (a.resourceType || '').toUpperCase();
+      let channel = a.channel;
+
+      if (!resourceType && a.target) {
+        const match = a.target.match(/^([A-Za-z]+)(\d+)$/);
+        if (match) {
+          resourceType = match[1].toUpperCase();
+          channel = match[2];
+        }
+      }
+
+      if (!resourceType) resourceType = 'Q';
+      if (channel === undefined || channel === null) channel = 1;
+
+      const targetStr = `${resourceType}${channel}`;
+
+      if (q === 'X') {
+        lines.push(`${targetStr}=M${s.id}`);
+      } else if (q === 'S') {
+        lines.push(`S${targetStr}=M${s.id}`);
+      } else if (q === 'R') {
+        lines.push(`R${targetStr}=M${s.id}`);
+      } else if (q === 'Z') {
+        lines.push(`Z${targetStr}=M${s.id}`);
+      } else if (q === 'P') {
+        lines.push(`${targetStr}=P(M${s.id})`);
+      } else if (q === 'N') {
+        lines.push(`${targetStr}=N(M${s.id})`);
+      } else if (q === 'T') {
+        lines.push(`T${channel}=M${s.id}`);
+      } else {
+        lines.push(`${targetStr}=M${s.id}`);
       }
     });
   });
@@ -136,18 +145,18 @@ function generateUserver03(ir) {
 
   (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
   (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
-  (ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+  (ir.comparats || ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
 
   ir.steps.forEach((s) => {
     (s.actions || []).forEach((a) => {
       let resourceType = (a.resourceType || '').toUpperCase();
       let channel = Number(a.channel);
 
-      if ((!resourceType || isNaN(channel)) && a.target) {
-        const match = a.target.match(/^([a-zA-Z]+)(\d+)$/);
+      if (!resourceType && a.target) {
+        const match = a.target.match(/^([A-Za-z]+)(\d+)$/);
         if (match) {
           resourceType = match[1].toUpperCase();
-          channel = parseInt(match[2], 10);
+          channel = Number(match[2]);
         }
       }
 
@@ -155,35 +164,35 @@ function generateUserver03(ir) {
         if (!timersMap.has(channel) || a.preset !== undefined) {
           timersMap.set(channel, {
             id: channel,
-            fun: a.functionType ?? 1,
-            pst: a.preset ?? 5,
-            ofs: a.offset ?? 0
+            fun: a.functionType ?? (timersMap.get(channel)?.fun ?? 1),
+            pst: a.preset ?? (timersMap.get(channel)?.pst ?? 5),
+            ofs: a.offset ?? (timersMap.get(channel)?.ofs ?? 0)
           });
         }
       } else if (resourceType === 'C' && !isNaN(channel)) {
         if (!countersMap.has(channel) || a.preset !== undefined) {
           countersMap.set(channel, {
             id: channel,
-            fun: a.functionType ?? 1,
-            pst: a.preset ?? 5,
-            ofs: a.offset ?? 0
+            fun: a.functionType ?? (countersMap.get(channel)?.fun ?? 1),
+            pst: a.preset ?? (countersMap.get(channel)?.pst ?? 5),
+            ofs: a.offset ?? (countersMap.get(channel)?.ofs ?? 0)
           });
         }
       } else if (resourceType === 'A' && !isNaN(channel)) {
         if (!comparersMap.has(channel) || a.preset !== undefined) {
           comparersMap.set(channel, {
             id: channel,
-            prt: a.port ?? 1,
-            fun: a.functionType ?? 2,
-            pst: a.preset ?? 2.15,
-            ofs: a.offset ?? 0
+            prt: a.port ?? (comparersMap.get(channel)?.prt ?? 1),
+            fun: a.functionType ?? (comparersMap.get(channel)?.fun ?? 2),
+            pst: a.preset ?? (comparersMap.get(channel)?.pst ?? 2.15),
+            ofs: a.offset ?? (comparersMap.get(channel)?.ofs ?? 0)
           });
         }
       }
     });
   });
 
-  (ir.transitions || []).forEach((t) => {
+  ir.transitions.forEach((t) => {
     if (t.receptivity) {
       const timerMatches = t.receptivity.match(/\bT(\d+)\b/gi);
       if (timerMatches) {
@@ -225,7 +234,7 @@ function generateUserver03(ir) {
     lines: lines,
     timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
     counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
-    comparers: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
+    comparats: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
   };
 
   return {

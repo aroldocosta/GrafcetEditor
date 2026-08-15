@@ -91,7 +91,7 @@ describe('Userver03Generator', () => {
     ]);
   });
 
-  it('deve gerar seções de timers, counters e comparers no JSON a partir de ações T, C, A', () => {
+  it('deve gerar seções de timers, counters e comparats no JSON a partir de ações T, C, A', () => {
     const ir: GrafcetIR = {
       steps: [
         {
@@ -116,7 +116,7 @@ describe('Userver03Generator', () => {
     expect(parsed.counters).toEqual([
       { id: 2, fun: 1, pst: 10, ofs: 0 }
     ]);
-    expect(parsed.comparers).toEqual([
+    expect(parsed.comparats).toEqual([
       { id: 1, prt: 1, fun: 2, pst: 2.15, ofs: 0 }
     ]);
   });

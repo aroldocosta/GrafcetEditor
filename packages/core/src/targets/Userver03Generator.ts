@@ -91,10 +91,10 @@ export class Userver03Generator implements ICodeGenerator {
     const countersMap = new Map<number, { id: number; fun: number; pst: number; ofs: number }>();
     const comparersMap = new Map<number, { id: number; prt: number; fun: number; pst: number; ofs: number }>();
 
-    // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparers
+    // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparats
     (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
     (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
-    (ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+    (ir.comparats || ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
 
     // Varrer ações das etapas para incluir configurações de T, C, A definidos nas ações
     for (const step of ir.steps) {
@@ -188,7 +188,7 @@ export class Userver03Generator implements ICodeGenerator {
       lines: lines,
       timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
       counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
-      comparers: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
+      comparats: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
     };
 
     return {
