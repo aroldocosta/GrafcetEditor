@@ -100,6 +100,7 @@ function generateUserver03(ir) {
 
   // 2. Ações Associadas às Etapas
   ir.steps.forEach((s) => {
+    const stepMarker = `M${s.id}`;
     (s.actions || []).forEach((a) => {
       const q = (a.qualifier || 'X').toUpperCase();
       let resourceType = (a.resourceType || '').toUpperCase();
@@ -118,22 +119,18 @@ function generateUserver03(ir) {
 
       const targetStr = `${resourceType}${channel}`;
 
-      if (q === 'X') {
-        lines.push(`${targetStr}=M${s.id}`);
+      if (q === 'X' || q === 'N' || q === 'P') {
+        lines.push(`X${targetStr}=${stepMarker}`);
       } else if (q === 'S') {
-        lines.push(`S${targetStr}=M${s.id}`);
+        lines.push(`S${targetStr}=${stepMarker}`);
       } else if (q === 'R') {
-        lines.push(`R${targetStr}=M${s.id}`);
+        lines.push(`R${targetStr}=${stepMarker}`);
       } else if (q === 'Z') {
-        lines.push(`Z${targetStr}=M${s.id}`);
-      } else if (q === 'P') {
-        lines.push(`${targetStr}=P(M${s.id})`);
-      } else if (q === 'N') {
-        lines.push(`${targetStr}=N(M${s.id})`);
+        lines.push(`Z${targetStr}=${stepMarker}`);
       } else if (q === 'T') {
-        lines.push(`T${channel}=M${s.id}`);
+        lines.push(`T${channel}=${stepMarker}`);
       } else {
-        lines.push(`${targetStr}=M${s.id}`);
+        lines.push(`${q}${targetStr}=${stepMarker}`);
       }
     });
   });
@@ -141,11 +138,27 @@ function generateUserver03(ir) {
   // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
   const timersMap = new Map();
   const countersMap = new Map();
-  const comparersMap = new Map();
+  const comparatsMap = new Map();
 
-  (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
-  (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
-  (ir.comparats || ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+  (ir.timers || []).forEach(t => timersMap.set(t.id, {
+    id: t.id,
+    funct: t.funct ?? t.functionType ?? 1,
+    preset: t.preset ?? 5,
+    offset: t.offset ?? 0
+  }));
+  (ir.counters || []).forEach(c => countersMap.set(c.id, {
+    id: c.id,
+    funct: c.funct ?? c.functionType ?? 1,
+    preset: c.preset ?? 5,
+    offset: c.offset ?? 0
+  }));
+  (ir.comparats || ir.comparers || []).forEach(cmp => comparatsMap.set(cmp.id, {
+    id: cmp.id,
+    offset: cmp.offset ?? 0,
+    funct: cmp.funct ?? cmp.functionType ?? 2,
+    preset: cmp.preset ?? 2.15,
+    analogId: cmp.analogId ?? cmp.port ?? 1
+  }));
 
   ir.steps.forEach((s) => {
     (s.actions || []).forEach((a) => {
@@ -164,28 +177,28 @@ function generateUserver03(ir) {
         if (!timersMap.has(channel) || a.preset !== undefined) {
           timersMap.set(channel, {
             id: channel,
-            fun: a.functionType ?? (timersMap.get(channel)?.fun ?? 1),
-            pst: a.preset ?? (timersMap.get(channel)?.pst ?? 5),
-            ofs: a.offset ?? (timersMap.get(channel)?.ofs ?? 0)
+            funct: a.functionType ?? (timersMap.get(channel)?.funct ?? 1),
+            preset: a.preset ?? (timersMap.get(channel)?.preset ?? 5),
+            offset: a.offset ?? (timersMap.get(channel)?.offset ?? 0)
           });
         }
       } else if (resourceType === 'C' && !isNaN(channel)) {
         if (!countersMap.has(channel) || a.preset !== undefined) {
           countersMap.set(channel, {
             id: channel,
-            fun: a.functionType ?? (countersMap.get(channel)?.fun ?? 1),
-            pst: a.preset ?? (countersMap.get(channel)?.pst ?? 5),
-            ofs: a.offset ?? (countersMap.get(channel)?.ofs ?? 0)
+            funct: a.functionType ?? (countersMap.get(channel)?.funct ?? 1),
+            preset: a.preset ?? (countersMap.get(channel)?.preset ?? 5),
+            offset: a.offset ?? (countersMap.get(channel)?.offset ?? 0)
           });
         }
       } else if (resourceType === 'A' && !isNaN(channel)) {
-        if (!comparersMap.has(channel) || a.preset !== undefined) {
-          comparersMap.set(channel, {
+        if (!comparatsMap.has(channel) || a.preset !== undefined) {
+          comparatsMap.set(channel, {
             id: channel,
-            prt: a.port ?? (comparersMap.get(channel)?.prt ?? 1),
-            fun: a.functionType ?? (comparersMap.get(channel)?.fun ?? 2),
-            pst: a.preset ?? (comparersMap.get(channel)?.pst ?? 2.15),
-            ofs: a.offset ?? (comparersMap.get(channel)?.ofs ?? 0)
+            offset: a.offset ?? (comparatsMap.get(channel)?.offset ?? 0),
+            funct: a.functionType ?? (comparatsMap.get(channel)?.funct ?? 2),
+            preset: a.preset ?? (comparatsMap.get(channel)?.preset ?? 2.15),
+            analogId: a.port ?? (comparatsMap.get(channel)?.analogId ?? 1)
           });
         }
       }
@@ -199,7 +212,7 @@ function generateUserver03(ir) {
         timerMatches.forEach((m) => {
           const id = parseInt(m.substring(1), 10);
           if (!isNaN(id) && !timersMap.has(id)) {
-            timersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+            timersMap.set(id, { id: id, funct: 1, preset: 5, offset: 0 });
           }
         });
       }
@@ -209,7 +222,7 @@ function generateUserver03(ir) {
         counterMatches.forEach((m) => {
           const id = parseInt(m.substring(1), 10);
           if (!isNaN(id) && !countersMap.has(id)) {
-            countersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+            countersMap.set(id, { id: id, funct: 1, preset: 5, offset: 0 });
           }
         });
       }
@@ -218,30 +231,73 @@ function generateUserver03(ir) {
       if (comparerMatches) {
         comparerMatches.forEach((m) => {
           const id = parseInt(m.substring(1), 10);
-          if (!isNaN(id) && !comparersMap.has(id)) {
-            comparersMap.set(id, { id: id, prt: 1, fun: 2, pst: 2.15, ofs: 0 });
+          if (!isNaN(id) && !comparatsMap.has(id)) {
+            comparatsMap.set(id, { id: id, offset: 0, funct: 2, preset: 2.15, analogId: 1 });
           }
         });
       }
     }
   });
 
-  if (lines.length > 0) {
-    lines[lines.length - 1] += ';';
-  }
+  const timers = Array.from(timersMap.values()).sort((a, b) => a.id - b.id);
+  const counters = Array.from(countersMap.values()).sort((a, b) => a.id - b.id);
+  const comparats = Array.from(comparatsMap.values()).sort((a, b) => a.id - b.id);
 
-  const configObj = {
+  const formattedOutput = formatInterpreterConfig({
     lines: lines,
-    timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
-    counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
-    comparats: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
-  };
+    timers: timers,
+    counters: counters,
+    comparats: comparats
+  });
 
   return {
     filename: 'code_param.cfg',
-    json: JSON.stringify(configObj, null, 2),
-    lines: lines
+    output: formattedOutput,
+    content: formattedOutput,
+    lines: lines,
+    config: {
+      lines,
+      timers,
+      counters,
+      comparats
+    }
   };
+}
+
+function formatInterpreterConfig(data) {
+  const linesSection = data.lines.length > 0
+    ? 'lines:\n' + data.lines.map((line, idx) => {
+        const isLast = idx === data.lines.length - 1;
+        let cleanLine = line.trim();
+        if (cleanLine.endsWith(';') || cleanLine.endsWith(',')) {
+          cleanLine = cleanLine.slice(0, -1);
+        }
+        return `  ${cleanLine}${isLast ? ';' : ','}`;
+      }).join('\n')
+    : 'lines:';
+
+  const timersSection = data.timers && data.timers.length > 0
+    ? 'timers:\n' + data.timers.map((item, idx) => {
+        const isLast = idx === data.timers.length - 1;
+        return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}}${isLast ? '' : ','}`;
+      }).join('\n')
+    : 'timers:';
+
+  const countersSection = data.counters && data.counters.length > 0
+    ? 'counters:\n' + data.counters.map((item, idx) => {
+        const isLast = idx === data.counters.length - 1;
+        return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}}${isLast ? '' : ','}`;
+      }).join('\n')
+    : 'counters:';
+
+  const comparatsSection = data.comparats && data.comparats.length > 0
+    ? 'comparats:\n' + data.comparats.map((item, idx) => {
+        const isLast = idx === data.comparats.length - 1;
+        return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}, analogId: ${item.analogId}}${isLast ? '' : ','}`;
+      }).join('\n')
+    : 'comparats:';
+
+  return [linesSection, timersSection, countersSection, comparatsSection].join('\n');
 }
 
 function compile(steps) {
@@ -249,7 +305,71 @@ function compile(steps) {
   const output = generateUserver03(ir);
 
   console.log("=== COMPILAÇÃO USERVER03 (code_param.cfg) ===");
-  console.log(output.json);
-  
+  console.log(output.output);
+
+  showCompileModal(output.output);
   return output;
+}
+
+function showCompileModal(compiledCode) {
+  let overlay = document.querySelector(".modal-overlay.compile-overlay");
+  if (overlay) overlay.remove();
+
+  overlay = document.createElement("div");
+  overlay.className = "modal-overlay compile-overlay";
+
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.style.minWidth = "560px";
+  modal.style.maxWidth = "700px";
+
+  modal.innerHTML = `
+    <h2>Código Compilado (code_param.cfg)</h2>
+    <div style="margin-bottom: 12px; font-size: 13px; color: #666;">
+      Saída gerada para o interpretador / ESP32:
+    </div>
+    <textarea id="compiled-code-area" readonly style="
+      width: 100%;
+      height: 320px;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f8f9fa;
+      box-sizing: border-box;
+      resize: vertical;
+      white-space: pre;
+    ">${compiledCode}</textarea>
+    <div class="modal-buttons" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button id="copy-compiled-btn" class="modal-btn" style="background: #28a745; color: white;">Copiar</button>
+      <button id="download-compiled-btn" class="modal-btn" style="background: #007bff; color: white;">Baixar .cfg</button>
+      <button id="close-compiled-btn" class="modal-btn" style="background: #6c757d; color: white;">Fechar</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  modal.querySelector("#copy-compiled-btn").addEventListener("click", () => {
+    navigator.clipboard.writeText(compiledCode).then(() => {
+      const btn = modal.querySelector("#copy-compiled-btn");
+      btn.innerText = "Copiado!";
+      setTimeout(() => { btn.innerText = "Copiar"; }, 2000);
+    });
+  });
+
+  modal.querySelector("#download-compiled-btn").addEventListener("click", () => {
+    const blob = new Blob([compiledCode], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "code_param.cfg";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  modal.querySelector("#close-compiled-btn").addEventListener("click", () => {
+    overlay.remove();
+  });
 }

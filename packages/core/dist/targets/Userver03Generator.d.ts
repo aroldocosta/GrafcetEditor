@@ -7,6 +7,10 @@ export declare class Userver03Generator implements ICodeGenerator {
     readonly mimeType = "application/json";
     generate(ir: GrafcetIR): GeneratedOutput;
     /**
+     * Formata a saída no padrão do interpretador userver03
+     */
+    private formatInterpreterConfig;
+    /**
      * Normaliza operadores lógicos para a sintaxe do userver03 (*, +, !)
      */
     private normalizeReceptivity;

@@ -35,26 +35,30 @@ export interface TransitionNode {
 
 export interface TimerConfig {
   id: number;
-  preset: number;      // Tempo em ms
-  offset: number;
-  functionType: number;
+  funct: number;       // Modo de operação (ex: 1, 2, 3, 4)
+  preset: number;      // Tempo / Valor limite
+  offset: number;      // Offset
+  functionType?: number; // Compatibilidade
 }
 
 export interface CounterConfig {
   id: number;
+  funct: number;
   preset: number;
   offset: number;
-  functionType: number;
+  functionType?: number;
 }
 
-export interface ComparerConfig {
+export interface ComparatConfig {
   id: number;
-  port: number;
-  preset: number;
   offset: number;
-  functionType: number;
+  funct: number;
+  preset: number;
+  analogId: number;    // Canal de entrada analógica
+  port?: number;       // Compatibilidade
+  functionType?: number; // Compatibilidade
 }
-export type ComparatConfig = ComparerConfig;
+export type ComparerConfig = ComparatConfig;
 
 export interface GrafcetIR {
   name?: string;
@@ -62,6 +66,6 @@ export interface GrafcetIR {
   transitions: TransitionNode[];
   timers?: TimerConfig[];
   counters?: CounterConfig[];
-  comparers?: ComparerConfig[];
   comparats?: ComparatConfig[];
+  comparers?: ComparerConfig[];
 }

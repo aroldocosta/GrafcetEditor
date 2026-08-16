@@ -27,30 +27,34 @@ export interface TransitionNode {
 }
 export interface TimerConfig {
     id: number;
+    funct: number;
     preset: number;
     offset: number;
-    functionType: number;
+    functionType?: number;
 }
 export interface CounterConfig {
     id: number;
+    funct: number;
     preset: number;
     offset: number;
-    functionType: number;
+    functionType?: number;
 }
-export interface ComparerConfig {
+export interface ComparatConfig {
     id: number;
-    port: number;
-    preset: number;
     offset: number;
-    functionType: number;
+    funct: number;
+    preset: number;
+    analogId: number;
+    port?: number;
+    functionType?: number;
 }
-export type ComparatConfig = ComparerConfig;
+export type ComparerConfig = ComparatConfig;
 export interface GrafcetIR {
     name?: string;
     steps: StepNode[];
     transitions: TransitionNode[];
     timers?: TimerConfig[];
     counters?: CounterConfig[];
-    comparers?: ComparerConfig[];
     comparats?: ComparatConfig[];
+    comparers?: ComparerConfig[];
 }

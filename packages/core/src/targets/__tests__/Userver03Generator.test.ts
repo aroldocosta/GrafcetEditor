@@ -9,7 +9,7 @@ describe('Userver03Generator', () => {
     const ir: GrafcetIR = {
       steps: [
         { id: 1, isInitial: true, actions: [] },
-        { id: 2, isInitial: false, actions: [{ type: 'N', target: 'Q1' }] }
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', target: 'Q1' }] }
       ],
       transitions: [
         { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'I1' }
@@ -17,13 +17,12 @@ describe('Userver03Generator', () => {
     };
 
     const output = generator.generate(ir);
-    const parsed = JSON.parse(output.content);
+    const config = output.metadata?.config;
 
-    expect(parsed.lines).toEqual([
+    expect(config.lines).toEqual([
       'SM2=M1*I1',
       'RM1=M1*I1',
-      'SQ1=M2',
-      'RQ1=!M2;'
+      'XQ1=M2;'
     ]);
   });
 
@@ -43,9 +42,9 @@ describe('Userver03Generator', () => {
     };
 
     const output = generator.generate(ir);
-    const parsed = JSON.parse(output.content);
+    const config = output.metadata?.config;
 
-    expect(parsed.lines).toEqual([
+    expect(config.lines).toEqual([
       'SM5=M2',
       'ZQ2=M2;'
     ]);
@@ -63,10 +62,10 @@ describe('Userver03Generator', () => {
     };
 
     const output = generator.generate(ir);
-    const parsed = JSON.parse(output.content);
+    const config = output.metadata?.config;
 
-    expect(parsed.lines[0]).toBe('SM2=M1*I1*!I2');
-    expect(parsed.lines[1]).toBe('RM1=M1*I1*!I2;');
+    expect(config.lines[0]).toBe('SM2=M1*I1*!I2');
+    expect(config.lines[1]).toBe('RM1=M1*I1*!I2;');
   });
 
   it('deve suportar divergência em E (ativação paralela de etapas)', () => {
@@ -82,23 +81,23 @@ describe('Userver03Generator', () => {
     };
 
     const output = generator.generate(ir);
-    const parsed = JSON.parse(output.content);
+    const config = output.metadata?.config;
 
-    expect(parsed.lines).toEqual([
+    expect(config.lines).toEqual([
       'SM2=M1*I1',
       'SM3=M1*I1',
       'RM1=M1*I1;'
     ]);
   });
 
-  it('deve gerar seções de timers, counters e comparats no JSON a partir de ações T, C, A', () => {
+  it('deve gerar seções de timers, counters e comparats no formato especificado', () => {
     const ir: GrafcetIR = {
       steps: [
         {
           id: 1,
           isInitial: true,
           actions: [
-            { qualifier: 'T', resourceType: 'T', channel: 1, preset: 5, offset: 0, functionType: 1 },
+            { qualifier: 'T', resourceType: 'T', channel: 1, preset: 5, offset: 0, functionType: 3 },
             { qualifier: 'S', resourceType: 'C', channel: 2, preset: 10, offset: 0, functionType: 1 },
             { qualifier: 'X', resourceType: 'A', channel: 1, port: 1, functionType: 2, preset: 2.15, offset: 0 }
           ]
@@ -108,16 +107,79 @@ describe('Userver03Generator', () => {
     };
 
     const output = generator.generate(ir);
-    const parsed = JSON.parse(output.content);
+    const config = output.metadata?.config;
 
-    expect(parsed.timers).toEqual([
-      { id: 1, fun: 1, pst: 5, ofs: 0 }
+    expect(config.timers).toEqual([
+      { id: 1, funct: 3, preset: 5, offset: 0 }
     ]);
-    expect(parsed.counters).toEqual([
-      { id: 2, fun: 1, pst: 10, ofs: 0 }
+    expect(config.counters).toEqual([
+      { id: 2, funct: 1, preset: 10, offset: 0 }
     ]);
-    expect(parsed.comparats).toEqual([
-      { id: 1, prt: 1, fun: 2, pst: 2.15, ofs: 0 }
+    expect(config.comparats).toEqual([
+      { id: 1, offset: 0, funct: 2, preset: 2.15, analogId: 1 }
     ]);
+
+    expect(output.content).toContain('lines:');
+    expect(output.content).toContain('timers:\n  {id: 1, funct: 3, preset: 5, offset: 0}');
+    expect(output.content).toContain('counters:\n  {id: 2, funct: 1, preset: 10, offset: 0}');
+    expect(output.content).toContain('comparats:\n  {id: 1, funct: 2, preset: 2.15, offset: 0, analogId: 1}');
+  });
+
+  it('deve gerar exatamente o formato completo solicitado com vírgulas e ponto-e-vírgula', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [] },
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 3, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: '1' },
+        { id: 2, fromSteps: [2], toSteps: [3], receptivity: 'T1' },
+        { id: 3, fromSteps: [3], toSteps: [1], receptivity: 'T2' }
+      ],
+      timers: [
+        { id: 1, funct: 1, preset: 5, offset: 0 },
+        { id: 2, funct: 1, preset: 5, offset: 0 },
+        { id: 3, funct: 1, preset: 5, offset: 0 }
+      ],
+      counters: [
+        { id: 1, funct: 1, preset: 5, offset: 0 },
+        { id: 2, funct: 1, preset: 5, offset: 0 },
+        { id: 3, funct: 1, preset: 5, offset: 0 }
+      ],
+      comparats: [
+        { id: 1, funct: 1, preset: 1.5, offset: 0, analogId: 1 },
+        { id: 2, funct: 1, preset: 1.5, offset: 0, analogId: 1 },
+        { id: 3, funct: 1, preset: 1.5, offset: 0, analogId: 1 }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const expected = 
+`lines:
+  SM2=M1*1,
+  RM1=M1*1,
+  SM3=M2*T1,
+  RM2=M2*T1,
+  SM1=M3*T2,
+  RM3=M3*T2,
+  XQ1=M2,
+  XQ1=M3;
+timers:
+  {id: 1, funct: 1, preset: 5, offset: 0},
+  {id: 2, funct: 1, preset: 5, offset: 0},
+  {id: 3, funct: 1, preset: 5, offset: 0}
+counters:
+  {id: 1, funct: 1, preset: 5, offset: 0},
+  {id: 2, funct: 1, preset: 5, offset: 0},
+  {id: 3, funct: 1, preset: 5, offset: 0}
+comparats:
+  {id: 1, funct: 1, preset: 1.5, offset: 0, analogId: 1},
+  {id: 2, funct: 1, preset: 1.5, offset: 0, analogId: 1},
+  {id: 3, funct: 1, preset: 1.5, offset: 0, analogId: 1}`;
+
+    expect(output.content).toBe(expected);
   });
 });
+
+

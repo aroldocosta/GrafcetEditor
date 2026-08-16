@@ -45,8 +45,7 @@ export class Userver03Generator {
                     case 'X':
                     case 'P':
                     case 'N': // Sem Retenção (Normal)
-                        lines.push(`S${coilTarget}=${stepMarker}`);
-                        lines.push(`R${coilTarget}=!${stepMarker}`);
+                        lines.push(`X${coilTarget}=${stepMarker}`);
                         break;
                     case 'S': // Set (Ativa Retenção / Latch)
                         lines.push(`S${coilTarget}=${stepMarker}`);
@@ -61,7 +60,7 @@ export class Userver03Generator {
                         lines.push(`T${coilTarget}=${stepMarker}`);
                         break;
                     default:
-                        lines.push(`S${coilTarget}=${stepMarker}`);
+                        lines.push(`${qualifier}${coilTarget}=${stepMarker}`);
                         break;
                 }
             }
@@ -69,11 +68,27 @@ export class Userver03Generator {
         // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
         const timersMap = new Map();
         const countersMap = new Map();
-        const comparersMap = new Map();
+        const comparatsMap = new Map();
         // Inicializar com entradas explícitas do ir.timers, ir.counters, ir.comparats
-        (ir.timers || []).forEach(t => timersMap.set(t.id, { id: t.id, fun: t.functionType ?? 1, pst: t.preset ?? 5, ofs: t.offset ?? 0 }));
-        (ir.counters || []).forEach(c => countersMap.set(c.id, { id: c.id, fun: c.functionType ?? 1, pst: c.preset ?? 5, ofs: c.offset ?? 0 }));
-        (ir.comparats || ir.comparers || []).forEach(cmp => comparersMap.set(cmp.id, { id: cmp.id, prt: cmp.port ?? 1, fun: cmp.functionType ?? 2, pst: cmp.preset ?? 2.15, ofs: cmp.offset ?? 0 }));
+        (ir.timers || []).forEach(t => timersMap.set(t.id, {
+            id: t.id,
+            funct: t.funct ?? t.functionType ?? 1,
+            preset: t.preset ?? 5,
+            offset: t.offset ?? 0
+        }));
+        (ir.counters || []).forEach(c => countersMap.set(c.id, {
+            id: c.id,
+            funct: c.funct ?? c.functionType ?? 1,
+            preset: c.preset ?? 5,
+            offset: c.offset ?? 0
+        }));
+        (ir.comparats || ir.comparers || []).forEach(cmp => comparatsMap.set(cmp.id, {
+            id: cmp.id,
+            offset: cmp.offset ?? 0,
+            funct: cmp.funct ?? cmp.functionType ?? 2,
+            preset: cmp.preset ?? 2.15,
+            analogId: cmp.analogId ?? cmp.port ?? 1
+        }));
         // Varrer ações das etapas para incluir configurações de T, C, A definidos nas ações
         for (const step of ir.steps) {
             for (const action of step.actions) {
@@ -91,9 +106,9 @@ export class Userver03Generator {
                     if (!timersMap.has(channel) || action.preset !== undefined) {
                         timersMap.set(channel, {
                             id: channel,
-                            fun: action.functionType ?? 1,
-                            pst: action.preset ?? 5,
-                            ofs: action.offset ?? 0
+                            funct: action.functionType ?? (timersMap.get(channel)?.funct ?? 1),
+                            preset: action.preset ?? (timersMap.get(channel)?.preset ?? 5),
+                            offset: action.offset ?? (timersMap.get(channel)?.offset ?? 0)
                         });
                     }
                 }
@@ -101,20 +116,20 @@ export class Userver03Generator {
                     if (!countersMap.has(channel) || action.preset !== undefined) {
                         countersMap.set(channel, {
                             id: channel,
-                            fun: action.functionType ?? 1,
-                            pst: action.preset ?? 5,
-                            ofs: action.offset ?? 0
+                            funct: action.functionType ?? (countersMap.get(channel)?.funct ?? 1),
+                            preset: action.preset ?? (countersMap.get(channel)?.preset ?? 5),
+                            offset: action.offset ?? (countersMap.get(channel)?.offset ?? 0)
                         });
                     }
                 }
                 else if (resourceType === 'A' && !isNaN(channel)) {
-                    if (!comparersMap.has(channel) || action.preset !== undefined) {
-                        comparersMap.set(channel, {
+                    if (!comparatsMap.has(channel) || action.preset !== undefined) {
+                        comparatsMap.set(channel, {
                             id: channel,
-                            prt: action.port ?? 1,
-                            fun: action.functionType ?? 2,
-                            pst: action.preset ?? 2.15,
-                            ofs: action.offset ?? 0
+                            offset: action.offset ?? (comparatsMap.get(channel)?.offset ?? 0),
+                            funct: action.functionType ?? (comparatsMap.get(channel)?.funct ?? 2),
+                            preset: action.preset ?? (comparatsMap.get(channel)?.preset ?? 2.15),
+                            analogId: action.port ?? (comparatsMap.get(channel)?.analogId ?? 1)
                         });
                     }
                 }
@@ -128,7 +143,7 @@ export class Userver03Generator {
                     timerMatches.forEach(m => {
                         const id = parseInt(m.substring(1), 10);
                         if (!isNaN(id) && !timersMap.has(id)) {
-                            timersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+                            timersMap.set(id, { id: id, funct: 1, preset: 5, offset: 0 });
                         }
                     });
                 }
@@ -137,7 +152,7 @@ export class Userver03Generator {
                     counterMatches.forEach(m => {
                         const id = parseInt(m.substring(1), 10);
                         if (!isNaN(id) && !countersMap.has(id)) {
-                            countersMap.set(id, { id: id, fun: 1, pst: 5, ofs: 0 });
+                            countersMap.set(id, { id: id, funct: 1, preset: 5, offset: 0 });
                         }
                     });
                 }
@@ -145,35 +160,78 @@ export class Userver03Generator {
                 if (comparerMatches) {
                     comparerMatches.forEach(m => {
                         const id = parseInt(m.substring(1), 10);
-                        if (!isNaN(id) && !comparersMap.has(id)) {
-                            comparersMap.set(id, { id: id, prt: 1, fun: 2, pst: 2.15, ofs: 0 });
+                        if (!isNaN(id) && !comparatsMap.has(id)) {
+                            comparatsMap.set(id, { id: id, offset: 0, funct: 2, preset: 2.15, analogId: 1 });
                         }
                     });
                 }
             }
         }
         // Adicionar ponto e vírgula na última linha do script para marcar o fim do loop do interpretador
-        if (lines.length > 0) {
+        if (lines.length > 0 && !lines[lines.length - 1].endsWith(';')) {
             lines[lines.length - 1] += ';';
         }
-        // 4. Montar a estrutura final do JSON do userver03 (/code_param.cfg)
-        const jsonOutput = {
-            lines: lines,
-            timers: Array.from(timersMap.values()).sort((a, b) => a.id - b.id),
-            counters: Array.from(countersMap.values()).sort((a, b) => a.id - b.id),
-            comparats: Array.from(comparersMap.values()).sort((a, b) => a.id - b.id)
-        };
+        const timers = Array.from(timersMap.values()).sort((a, b) => a.id - b.id);
+        const counters = Array.from(countersMap.values()).sort((a, b) => a.id - b.id);
+        const comparats = Array.from(comparatsMap.values()).sort((a, b) => a.id - b.id);
+        // 4. Montar a estrutura formatada do userver03 (/code_param.cfg)
+        const formattedContent = this.formatInterpreterConfig({
+            lines,
+            timers,
+            counters,
+            comparats
+        });
         return {
             targetId: this.targetId,
             filename: 'code_param.cfg',
             mimeType: this.mimeType,
-            content: JSON.stringify(jsonOutput, null, 2),
+            content: formattedContent,
             metadata: {
                 totalLines: lines.length,
                 stepsCount: ir.steps.length,
-                transitionsCount: ir.transitions.length
+                transitionsCount: ir.transitions.length,
+                config: {
+                    lines,
+                    timers,
+                    counters,
+                    comparats
+                }
             }
         };
+    }
+    /**
+     * Formata a saída no padrão do interpretador userver03
+     */
+    formatInterpreterConfig(data) {
+        const linesSection = data.lines.length > 0
+            ? 'lines:\n' + data.lines.map((line, idx) => {
+                const isLast = idx === data.lines.length - 1;
+                let cleanLine = line.trim();
+                if (cleanLine.endsWith(';') || cleanLine.endsWith(',')) {
+                    cleanLine = cleanLine.slice(0, -1);
+                }
+                return `  ${cleanLine}${isLast ? ';' : ','}`;
+            }).join('\n')
+            : 'lines:';
+        const timersSection = data.timers && data.timers.length > 0
+            ? 'timers:\n' + data.timers.map((item, idx) => {
+                const isLast = idx === data.timers.length - 1;
+                return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}}${isLast ? '' : ','}`;
+            }).join('\n')
+            : 'timers:';
+        const countersSection = data.counters && data.counters.length > 0
+            ? 'counters:\n' + data.counters.map((item, idx) => {
+                const isLast = idx === data.counters.length - 1;
+                return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}}${isLast ? '' : ','}`;
+            }).join('\n')
+            : 'counters:';
+        const comparatsSection = data.comparats && data.comparats.length > 0
+            ? 'comparats:\n' + data.comparats.map((item, idx) => {
+                const isLast = idx === data.comparats.length - 1;
+                return `  {id: ${item.id}, funct: ${item.funct}, preset: ${item.preset}, offset: ${item.offset}, analogId: ${item.analogId}}${isLast ? '' : ','}`;
+            }).join('\n')
+            : 'comparats:';
+        return [linesSection, timersSection, countersSection, comparatsSection].join('\n');
     }
     /**
      * Normaliza operadores lógicos para a sintaxe do userver03 (*, +, !)
