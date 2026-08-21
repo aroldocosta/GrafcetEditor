@@ -11,32 +11,117 @@ let clickTimeout = null;
 const STORAGE_KEY = "grafcet_saved_diagram";
 let saveTimeout = null;
 
+let _draggedType = null;
+
 palette.querySelectorAll(".box").forEach(box => {
   box.addEventListener("dragstart", e => {
-    // Centralizar cursor no centro do objeto na paleta usando setDragImage
-    e.dataTransfer.setData("type", box.classList.contains("start_step") ? "start_step" : "active_step");
+    let type = "active_step";
+    if (box.classList.contains("start_step")) type = "start_step";
+    else if (box.classList.contains("active_step")) type = "active_step";
+    else if (box.classList.contains("or_divergence")) type = "or_divergence";
+    else if (box.classList.contains("or_convergence")) type = "or_convergence";
 
-    // Clonar elemento para usar como drag image
+    _draggedType = type;
+
+    if (e.dataTransfer) {
+      e.dataTransfer.setData("type", type);
+      e.dataTransfer.setData("text/plain", type);
+      e.dataTransfer.effectAllowed = "copy";
+    }
+
     const clone = box.cloneNode(true);
     clone.style.position = "absolute";
-    clone.style.top = "-1000px"; // fora da viewport
+    clone.style.top = "-1000px";
     clone.style.left = "-1000px";
-    clone.style.pointerEvents = "none"; // não interfere
+    clone.style.pointerEvents = "none";
     document.body.appendChild(clone);
 
     const rect = clone.getBoundingClientRect();
-    // Centralizar no meio
     const offsetX = rect.width / 2;
     const offsetY = rect.height / 2;
 
-    e.dataTransfer.setDragImage(clone, offsetX, offsetY);
-
-    // Remover clone após dragstart para não poluir o DOM
+    if (e.dataTransfer && e.dataTransfer.setDragImage) {
+      e.dataTransfer.setDragImage(clone, offsetX, offsetY);
+    }
     setTimeout(() => document.body.removeChild(clone), 0);
   });
 });
 
-canvas.addEventListener("dragover", e => e.preventDefault());
+function handleCanvasDrop(e) {
+  e.preventDefault();
+  let type = e.dataTransfer ? e.dataTransfer.getData("type") : null;
+  if (!type) {
+    type = _draggedType || "active_step";
+  }
+  if (!type || typeof type !== "string") return;
+
+  const template = palette.querySelector(`.${type}`);
+  if (!template) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const isBranch = type === "or_divergence" || type === "or_convergence";
+  const boxWidth = isBranch ? 360 : 100;
+  const left = e.clientX - rect.left - (boxWidth / 2);
+  const top = e.clientY - rect.top - 30;
+
+  const clone = template.cloneNode(true);
+  clone.style.position = "absolute";
+  clone.style.left = left + "px";
+  clone.style.top = top + "px";
+  clone.draggable = false;
+
+  const state = (type === "start_step") ? "active" : "inactive";
+  clone.setAttribute("data-state", state);
+
+  const inner = clone.querySelector(".inner-rect");
+  if (inner && state === "active") {
+    inner.style.border = "5px double darkblue";
+  }
+
+  canvas.appendChild(clone);
+  makeDraggable(clone);
+  attachConnectorListeners(clone);
+  attachHoverListeners(clone);
+  attachRemoveListener(clone);
+  renumberBoxes();
+
+  const step = new Step(type, clone, state);
+  step.id = ++boxCounter;
+  step.branchOutputs = {};
+  step.branchInputs = {};
+
+  if (type === "or_divergence") {
+    step.transitions = [
+      new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 1' }),
+      new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 2' })
+    ];
+  } else if (type === "or_convergence") {
+    step.transitions = [];
+  } else {
+    createTransitionForStep(step);
+  }
+
+  clone.setAttribute("data-id", step.id);
+  stepsList.push(step);
+
+  printSteps();
+  debouncedSaveDiagram();
+}
+
+canvas.addEventListener("dragover", e => {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+});
+canvas.addEventListener("drop", handleCanvasDrop);
+
+const canvasViewportEl = document.getElementById("canvas-viewport");
+if (canvasViewportEl) {
+  canvasViewportEl.addEventListener("dragover", e => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  });
+  canvasViewportEl.addEventListener("drop", handleCanvasDrop);
+}
 
 canvas.addEventListener("click", e => {
   const actionBox = e.target.closest(".action-box");
@@ -51,50 +136,6 @@ canvas.addEventListener("click", e => {
       showActionsModal(targetStep);
     }
   }
-});
-
-canvas.addEventListener("drop", e => {
-  e.preventDefault();
-  const type = e.dataTransfer.getData("type");
-  const template = palette.querySelector(`.${type}`);
-  if (!template) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const left = e.clientX - rect.left - 50;
-  const top = e.clientY - rect.top - 45;
-
-  const clone = template.cloneNode(true);
-  clone.style.position = "absolute";
-  clone.style.left = left + "px";
-  clone.style.top = top + "px";
-  clone.draggable = false;
-
-  // Definir o state conforme o tipo
-  const state = (type === "start_step") ? "active" : "inactive";
-  clone.setAttribute("data-state", state);
-
-  const inner = clone.querySelector(".inner-rect");
-  if (state === "active") {
-    inner.style.border = "5px double darkblue";
-  }
-
-  canvas.appendChild(clone);
-  makeDraggable(clone);
-  attachConnectorListeners(clone);
-  attachHoverListeners(clone);
-  attachRemoveListener(clone);
-  renumberBoxes();
-
-  const step = new Step(type, clone, state);
-  step.id = ++boxCounter;
-  stepsList.push(step);
-
-  createTransitionForStep(step);  // <-- adiciona uma transition associada
-
-  clone.setAttribute("data-id", step.id);
-
-  printSteps();
-  debouncedSaveDiagram();
 });
 
 function makeDraggable(box) {
@@ -136,6 +177,15 @@ function makeDraggable(box) {
 }
 
 
+function getConnectorElement(box, connectorType, branch) {
+  if (!box) return null;
+  if (branch !== null && branch !== undefined && branch !== "") {
+    const specific = box.querySelector(`.connector.${connectorType}[data-branch="${branch}"]`);
+    if (specific) return specific;
+  }
+  return box.querySelector(`.connector.${connectorType}`);
+}
+
 function attachConnectorListeners(box) {
   box.querySelectorAll(".connector").forEach(connector => {
     connector.addEventListener("click", e => {
@@ -145,6 +195,7 @@ function attachConnectorListeners(box) {
       const connRect = connector.getBoundingClientRect();
       const x = connRect.left + connRect.width / 2 - rect.left;
       const y = connector.classList.contains("top") ? connRect.top - rect.top : connRect.bottom - rect.top;
+      const connBranch = connector.getAttribute("data-branch");
 
       if (!currentConnection) {
         const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
@@ -158,7 +209,7 @@ function attachConnectorListeners(box) {
           polyline.classList.add("hover-highlight");
           const conn = connections.find(c => c.polyline === polyline);
           if (conn) {
-            conn.from.box.querySelector(".inner-rect").classList.add("hover-highlight");
+            conn.from.box.querySelector(".inner-rect")?.classList.add("hover-highlight");
             conn.to?.box?.querySelector(".inner-rect")?.classList.add("hover-highlight");
           }
         });
@@ -166,7 +217,7 @@ function attachConnectorListeners(box) {
           polyline.classList.remove("hover-highlight");
           const conn = connections.find(c => c.polyline === polyline);
           if (conn) {
-            conn.from.box.querySelector(".inner-rect").classList.remove("hover-highlight");
+            conn.from.box.querySelector(".inner-rect")?.classList.remove("hover-highlight");
             conn.to?.box?.querySelector(".inner-rect")?.classList.remove("hover-highlight");
           }
         });
@@ -185,7 +236,11 @@ function attachConnectorListeners(box) {
 
         currentConnection = {
           polyline,
-          from: { box, connector: connector.classList.contains("top") ? "top" : "bottom" },
+          from: { 
+            box, 
+            connector: connector.classList.contains("top") ? "top" : "bottom",
+            branch: connBranch
+          },
           mouseMoveHandler: ev => {
             const mx = ev.clientX - rect.left;
             const my = ev.clientY - rect.top;
@@ -199,9 +254,9 @@ function attachConnectorListeners(box) {
           document.removeEventListener("mousemove", currentConnection.mouseMoveHandler);
         }
 
-        const fromConn = currentConnection.from.box.querySelector(`.connector.${currentConnection.from.connector}`);
-        const fromRect = fromConn.getBoundingClientRect();
-        const fromX = fromRect.left + 3 - rect.left;
+        const fromConn = getConnectorElement(currentConnection.from.box, currentConnection.from.connector, currentConnection.from.branch);
+        const fromRect = fromConn ? fromConn.getBoundingClientRect() : { left: x, top: y, width: 6, bottom: y };
+        const fromX = fromRect.left + fromRect.width / 2 - rect.left;
         const fromY = currentConnection.from.connector === "bottom"
           ? fromRect.bottom - rect.top
           : fromRect.top - rect.top;
@@ -230,12 +285,17 @@ function attachConnectorListeners(box) {
 
         currentConnection.polyline.setAttribute("points", points);
 
-        connections.push({
+        const newConn = {
           ...currentConnection,
-          to: { box, connector: connector.classList.contains("top") ? "top" : "bottom" }
-        });
+          to: { 
+            box, 
+            connector: connector.classList.contains("top") ? "top" : "bottom",
+            branch: connBranch
+          }
+        };
+        connections.push(newConn);
 
-        addStepConnection(currentConnection.from.box, box);
+        addStepConnection(currentConnection.from.box, box, currentConnection.from.branch, connBranch);
 
         currentConnection = null;
 
@@ -247,76 +307,115 @@ function attachConnectorListeners(box) {
 }
 
 function attachHoverListeners(box) {
-  
-  const inner = box.querySelector(".inner-rect");
-  box.addEventListener("mouseenter", () => {
-    inner.classList.add("hover-highlight");
-  });
-  box.addEventListener("mouseleave", () => {
-    inner.classList.remove("hover-highlight");
-  });
+  const isOrDiv = box.classList.contains("or_divergence");
+  const isOrConv = box.classList.contains("or_convergence");
 
-  inner.addEventListener("click", (e) => {
-    e.stopPropagation();
-   
-    if( shouldIgnoreClickDueToMove(box) ) return;
+  if (isOrDiv) {
+    const branchTransitions = box.querySelectorAll(".branch-transition");
+    branchTransitions.forEach(bt => {
+      const branchIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
 
-    clickTimeout = setTimeout(() => {
-      const stepId = parseInt(box.getAttribute("data-id"));
-      const step = stepsList.find(s => s.id === stepId);
-      if (step) {
-        showActionsModal(step);
+      let receptivityLabel = bt.querySelector(".receptivity-label");
+      if (!receptivityLabel) {
+        receptivityLabel = document.createElement("span");
+        receptivityLabel.className = "receptivity-label";
+        receptivityLabel.textContent = "";
+        receptivityLabel.style.position = "absolute";
+        receptivityLabel.style.left = "24px";
+        receptivityLabel.style.top = "50%";
+        receptivityLabel.style.transform = "translateY(-50%)";
+        receptivityLabel.style.fontSize = "13px";
+        receptivityLabel.style.color = "#1e293b";
+        receptivityLabel.style.fontWeight = "bold";
+        receptivityLabel.style.pointerEvents = "none";
+        receptivityLabel.style.whiteSpace = "nowrap";
+        bt.appendChild(receptivityLabel);
       }
-    }, 320);
-  });
+
+      bt.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (shouldIgnoreClickDueToMove(box)) return;
+        const stepId = parseInt(box.getAttribute("data-id"));
+        const step = stepsList.find(s => s.id === stepId);
+        if (!step || !step.transitions || !step.transitions[branchIdx]) return;
+        showReceptivityModal(step.transitions[branchIdx], bt);
+      });
+    });
+    return;
+  }
+
+  if (isOrConv) {
+    return;
+  }
+
+  const inner = box.querySelector(".inner-rect");
+  if (inner) {
+    box.addEventListener("mouseenter", () => {
+      inner.classList.add("hover-highlight");
+    });
+    box.addEventListener("mouseleave", () => {
+      inner.classList.remove("hover-highlight");
+    });
+
+    inner.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (shouldIgnoreClickDueToMove(box)) return;
+
+      clickTimeout = setTimeout(() => {
+        const stepId = parseInt(box.getAttribute("data-id"));
+        const step = stepsList.find(s => s.id === stepId);
+        if (step) {
+          showActionsModal(step);
+        }
+      }, 320);
+    });
+  }
   
   const transitionBar = box.querySelector(".transition");
-  transitionBar.addEventListener("mouseenter", () => {
-    transitionBar.classList.add("hover-highlight");
-  });
-  transitionBar.addEventListener("mouseleave", () => {
-    transitionBar.classList.remove("hover-highlight");
-  });
+  if (transitionBar) {
+    transitionBar.addEventListener("mouseenter", () => {
+      transitionBar.classList.add("hover-highlight");
+    });
+    transitionBar.addEventListener("mouseleave", () => {
+      transitionBar.classList.remove("hover-highlight");
+    });
 
-  // Novo listener de click para abrir o modal
-  transitionBar.addEventListener("click", (e) => {
-    e.stopPropagation();
+    transitionBar.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (shouldIgnoreClickDueToMove(box)) return;
+    
+      const stepId = parseInt(box.getAttribute("data-id"));
+      const step = stepsList.find(s => s.id === stepId);
+      if (!step || !step.transitions || step.transitions.length === 0) {
+        console.warn("Nenhuma transição encontrada para este step.");
+        return;
+      }
+      const transition = step.transitions[0];
+      showReceptivityModal(transition, transitionBar);
+    });
 
-    if( shouldIgnoreClickDueToMove(box) ) return;
-  
-    const stepId = parseInt(box.getAttribute("data-id"));
-    const step = stepsList.find(s => s.id === stepId);
-    if (!step || !step.transitions || step.transitions.length === 0) {
-      console.warn("Nenhuma transição encontrada para este step.");
-      return;
+    let receptivityLabel = transitionBar.querySelector(".receptivity-label");
+    if (!receptivityLabel) {
+      receptivityLabel = document.createElement("span");
+      receptivityLabel.className = "receptivity-label";
+      receptivityLabel.textContent = "";
+      receptivityLabel.style.position = "absolute";
+      receptivityLabel.style.left = "30px";
+      receptivityLabel.style.top = "50%";
+      receptivityLabel.style.transform = "translateY(-50%)";
+      receptivityLabel.style.fontSize = "14px";
+      receptivityLabel.style.color = "#333";
+      receptivityLabel.style.fontWeight = "bold";
+      receptivityLabel.style.pointerEvents = "none";
+      transitionBar.appendChild(receptivityLabel);
     }
-    const transition = step.transitions[0]; // assumindo uma única transição
-    showReceptivityModal(transition, transitionBar);
-  });
-
-  // Criar elemento <span> que mostrará a receptividade
-  const receptivityLabel = document.createElement("span");
-  receptivityLabel.className = "receptivity-label";
-  receptivityLabel.textContent = "";
-  receptivityLabel.style.position = "absolute";
-  receptivityLabel.style.left = "30px"; // à direita do tracinho
-  receptivityLabel.style.top = "50%";
-  receptivityLabel.style.transform = "translateY(-50%)";
-  receptivityLabel.style.fontSize = "14px";
-  receptivityLabel.style.color = "#333";
-  receptivityLabel.style.fontWeight = "bold";
-  receptivityLabel.style.pointerEvents = "none";
-  transitionBar.appendChild(receptivityLabel);
-
+  }
 }
-
 
 function attachRemoveListener(box) {
   box.addEventListener("dblclick", (e) => {
+    e.stopPropagation();
 
-    e.stopPropagation()
-
-    // Cancelar click pendente (se houver)
     if (clickTimeout) {
       clearTimeout(clickTimeout);
       clickTimeout = null;
@@ -346,9 +445,10 @@ function attachRemoveListener(box) {
 }
 
 function renumberBoxes() {
-  const boxes = [...canvas.querySelectorAll(".box")];
+  const boxes = [...canvas.querySelectorAll(".box:not(.or_divergence):not(.or_convergence)")];
   boxes.forEach((box, index) => {
-    box.querySelector(".inner-rect").textContent = index + 1;
+    const inner = box.querySelector(".inner-rect");
+    if (inner) inner.textContent = index + 1;
   });
 }
 
@@ -365,18 +465,22 @@ function updateConnections(box) {
   const rect = canvas.getBoundingClientRect();
   connections.forEach(conn => {
     if (conn.from.box === box || conn.to.box === box) {
-      const fromConn = conn.from.box.querySelector(`.connector.${conn.from.connector}`);
-      const toConn = conn.to.box.querySelector(`.connector.${conn.to.connector}`);
+      const fromConn = getConnectorElement(conn.from.box, conn.from.connector, conn.from.branch);
+      const toConn = getConnectorElement(conn.to.box, conn.to.connector, conn.to.branch);
+      if (!fromConn || !toConn) return;
 
-      const fromX = fromConn.getBoundingClientRect().left + 3 - rect.left;
+      const fromRect = fromConn.getBoundingClientRect();
+      const toRect = toConn.getBoundingClientRect();
+
+      const fromX = fromRect.left + fromRect.width / 2 - rect.left;
       const fromY = conn.from.connector === "top"
-        ? fromConn.getBoundingClientRect().top - rect.top
-        : fromConn.getBoundingClientRect().bottom - rect.top;
+        ? fromRect.top - rect.top
+        : fromRect.bottom - rect.top;
 
-      const toX = toConn.getBoundingClientRect().left + 3 - rect.left;
+      const toX = toRect.left + toRect.width / 2 - rect.left;
       const toY = conn.to.connector === "top"
-        ? toConn.getBoundingClientRect().top - rect.top
-        : toConn.getBoundingClientRect().bottom - rect.top;
+        ? toRect.top - rect.top
+        : toRect.bottom - rect.top;
 
       let points = "";
       if (conn.from.connector === "bottom" && conn.to.connector === "top" && toY < fromY) {
@@ -400,7 +504,7 @@ function updateConnections(box) {
   });
 }
 
-function addStepConnection(fromBox, toBox) {
+function addStepConnection(fromBox, toBox, fromBranch, toBranch) {
   const fromId = parseInt(fromBox.getAttribute("data-id"));
   const toId = parseInt(toBox.getAttribute("data-id"));
   if (isNaN(fromId) || isNaN(toId)) return;
@@ -415,11 +519,34 @@ function addStepConnection(fromBox, toBox) {
   if (!toStep.inputs.includes(fromStep.id)) {
     toStep.inputs.push(fromStep.id);
   }
+
+  // Mapear saídas por ramo na divergência OR
+  if (fromStep.type === "or_divergence") {
+    fromStep.branchOutputs = fromStep.branchOutputs || {};
+    const b = (fromBranch !== null && fromBranch !== undefined && fromBranch !== "") ? String(fromBranch) : "0";
+    fromStep.branchOutputs[b] = toStep.id;
+  }
+
+  // Mapear entradas por ramo na convergência OR
+  if (toStep.type === "or_convergence") {
+    toStep.branchInputs = toStep.branchInputs || {};
+    const b = (toBranch !== null && toBranch !== undefined && toBranch !== "") ? String(toBranch) : "0";
+    toStep.branchInputs[b] = fromStep.id;
+  }
+
+  // Ocultar transição do step se conectado à divergência OR
+  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && toStep.type === "or_divergence") {
+    fromBox.classList.add("connected-to-branch");
+  }
 }
 
 function removeStepConnection(connection) {
-  const fromId = parseInt(connection.from.box.getAttribute("data-id"));
-  const toId = parseInt(connection.to.box.getAttribute("data-id"));
+  const fromBox = connection.from?.box;
+  const toBox = connection.to?.box;
+  if (!fromBox || !toBox) return;
+
+  const fromId = parseInt(fromBox.getAttribute("data-id"));
+  const toId = parseInt(toBox.getAttribute("data-id"));
   if (isNaN(fromId) || isNaN(toId)) return;
 
   const fromStep = stepsList.find(s => s.id === fromId);
@@ -428,6 +555,28 @@ function removeStepConnection(connection) {
 
   fromStep.outputs = fromStep.outputs.filter(id => id !== toId);
   toStep.inputs = toStep.inputs.filter(id => id !== fromId);
+
+  if (fromStep.type === "or_divergence" && fromStep.branchOutputs) {
+    for (const [k, v] of Object.entries(fromStep.branchOutputs)) {
+      if (v === toStep.id) delete fromStep.branchOutputs[k];
+    }
+  }
+
+  if (toStep.type === "or_convergence" && toStep.branchInputs) {
+    for (const [k, v] of Object.entries(toStep.branchInputs)) {
+      if (v === fromStep.id) delete toStep.branchInputs[k];
+    }
+  }
+
+  // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência
+  if (fromStep.type === "start_step" || fromStep.type === "active_step") {
+    const stillConnectedToDiv = connections.some(c => 
+      c !== connection && c.from?.box === fromBox && c.to?.box?.classList.contains("or_divergence")
+    );
+    if (!stillConnectedToDiv) {
+      fromBox.classList.remove("connected-to-branch");
+    }
+  }
 }
 
 function updateStepsView() {
@@ -436,17 +585,20 @@ function updateStepsView() {
   oldActionBoxes.forEach(el => el.remove());
 
   stepsList.forEach(step => {
+    if (!step || !step.element) return;
     const inner = step.element.querySelector(".inner-rect");
-    if (step.state === "active") {
-      inner.style.border = step.type === "start_step"
-        ? "5px double darkblue"
-        : "3px solid darkblue";
-    } else {
-      inner.style.border = "";
+    if (inner) {
+      if (step.state === "active") {
+        inner.style.border = step.type === "start_step"
+          ? "5px double darkblue"
+          : "3px solid darkblue";
+      } else {
+        inner.style.border = "";
+      }
     }
 
     // Renderizar Actions ao lado direito do Step
-    if (step.actions && step.actions.length > 0) {
+    if (step.actions && step.actions.length > 0 && inner) {
       const rect = step.element.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
 
@@ -1092,6 +1244,8 @@ function saveDiagramToStorage() {
         },
         inputs: [...step.inputs],
         outputs: [...step.outputs],
+        branchOutputs: step.branchOutputs ? { ...step.branchOutputs } : undefined,
+        branchInputs: step.branchInputs ? { ...step.branchInputs } : undefined,
         transitions: (step.transitions || []).map(t => ({
           id: t.id,
           triggered: t.triggered,
@@ -1116,8 +1270,10 @@ function saveDiagramToStorage() {
       connections: connections.map(c => ({
         fromStepId: parseInt(c.from.box.getAttribute("data-id")),
         fromConnector: c.from.connector,
+        fromBranch: c.from.branch,
         toStepId: parseInt(c.to.box.getAttribute("data-id")),
-        toConnector: c.to.connector
+        toConnector: c.to.connector,
+        toBranch: c.to.branch
       }))
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1158,7 +1314,9 @@ function restoreDiagram(data) {
 
   // 1. Reconstruir steps
   data.steps.forEach(sData => {
-    const template = palette.querySelector(`.${sData.type}`);
+    const stepType = sData.type || "active_step";
+    if (!stepType || typeof stepType !== "string") return;
+    const template = palette.querySelector(`.${stepType}`);
     if (!template) return;
 
     const clone = template.cloneNode(true);
@@ -1172,7 +1330,7 @@ function restoreDiagram(data) {
     clone.setAttribute("data-id", sData.id);
 
     const inner = clone.querySelector(".inner-rect");
-    if (state === "active") {
+    if (inner && state === "active") {
       inner.style.border = sData.type === "start_step" ? "5px double darkblue" : "3px solid darkblue";
     }
 
@@ -1186,6 +1344,8 @@ function restoreDiagram(data) {
     step.id = sData.id;
     step.inputs = sData.inputs ? [...sData.inputs] : [];
     step.outputs = sData.outputs ? [...sData.outputs] : [];
+    step.branchOutputs = sData.branchOutputs ? { ...sData.branchOutputs } : {};
+    step.branchInputs = sData.branchInputs ? { ...sData.branchInputs } : {};
 
     if (Array.isArray(sData.transitions)) {
       step.transitions = sData.transitions.map(tData => new Transition({
@@ -1214,10 +1374,21 @@ function restoreDiagram(data) {
     }
 
     // Atualizar label da receptividade se houver
-    if (step.transitions && step.transitions.length > 0 && step.transitions[0].receptivity) {
-      const receptivityLabel = clone.querySelector(".receptivity-label");
-      if (receptivityLabel) {
-        receptivityLabel.textContent = step.transitions[0].receptivity;
+    if (sData.type === "or_divergence") {
+      const branchTransitions = clone.querySelectorAll(".branch-transition");
+      branchTransitions.forEach(bt => {
+        const bIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
+        if (step.transitions[bIdx] && step.transitions[bIdx].receptivity) {
+          const rLabel = bt.querySelector(".receptivity-label");
+          if (rLabel) rLabel.textContent = step.transitions[bIdx].receptivity;
+        }
+      });
+    } else {
+      if (step.transitions && step.transitions.length > 0 && step.transitions[0].receptivity) {
+        const receptivityLabel = clone.querySelector(".receptivity-label");
+        if (receptivityLabel) {
+          receptivityLabel.textContent = step.transitions[0].receptivity;
+        }
       }
     }
 
@@ -1273,11 +1444,16 @@ function restoreDiagram(data) {
 
       const connObj = {
         polyline,
-        from: { box: fromBox, connector: cData.fromConnector },
-        to: { box: toBox, connector: cData.toConnector }
+        from: { box: fromBox, connector: cData.fromConnector, branch: cData.fromBranch },
+        to: { box: toBox, connector: cData.toConnector, branch: cData.toBranch }
       };
 
       connections.push(connObj);
+
+      if (toBox.classList.contains("or_divergence")) {
+        fromBox.classList.add("connected-to-branch");
+      }
+
       updateConnections(fromBox);
     });
   }

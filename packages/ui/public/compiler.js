@@ -7,8 +7,12 @@ function buildGrafcetIR(stepsList) {
   const steps = [];
   const transitions = [];
   const processedTransitions = new Set();
+  const stepsMap = new Map(stepsList.map(s => [s.id, s]));
 
-  stepsList.forEach((s) => {
+  // 1. Filtrar e mapear apenas etapas reais (Start e Active)
+  const realSteps = stepsList.filter(s => s.type === 'start_step' || s.type === 'active_step');
+
+  realSteps.forEach((s) => {
     // Converter Ações da UI para o modelo IR
     const irActions = (s.actions || []).map((a) => {
       const qualifier = a.qualifier || (a.type === 'S' ? 'S' : a.type === 'R' ? 'R' : a.type === 'Z' ? 'Z' : a.type === 'T' ? 'T' : 'X');
@@ -36,24 +40,78 @@ function buildGrafcetIR(stepsList) {
       actions: irActions
     });
 
-    // Converter Transições ligadas a este passo
+    // 2. Resolver as transições de saída a partir de s
     if (s.outputs && s.outputs.length > 0) {
       s.outputs.forEach((targetStepId) => {
-        const transKey = `${s.id}->${targetStepId}`;
-        if (!processedTransitions.has(transKey)) {
-          processedTransitions.add(transKey);
+        const targetNode = stepsMap.get(targetStepId);
+        if (!targetNode) return;
 
-          // Obter receptividade definida no modelo (padrão: I{stepId})
-          const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity) 
-            ? s.transitions[0].receptivity 
-            : `I${s.id}`;
+        // Caso A: Conexão direta Step -> Step
+        if (targetNode.type === 'start_step' || targetNode.type === 'active_step') {
+          const transKey = `${s.id}->${targetNode.id}`;
+          if (!processedTransitions.has(transKey)) {
+            processedTransitions.add(transKey);
+            const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity) 
+              ? s.transitions[0].receptivity 
+              : `I${s.id}`;
 
-          transitions.push({
-            id: transitions.length + 1,
-            fromSteps: [s.id],
-            toSteps: [targetStepId],
-            receptivity: receptivity
+            transitions.push({
+              id: transitions.length + 1,
+              fromSteps: [s.id],
+              toSteps: [targetNode.id],
+              receptivity: receptivity
+            });
+          }
+        }
+        // Caso B: Step -> Divergência OR
+        else if (targetNode.type === 'or_divergence') {
+          const branches = [0, 1];
+          branches.forEach(branchIdx => {
+            const destId = targetNode.branchOutputs ? targetNode.branchOutputs[String(branchIdx)] : undefined;
+            if (destId) {
+              const destNode = stepsMap.get(destId);
+              if (destNode && (destNode.type === 'start_step' || destNode.type === 'active_step')) {
+                const transKey = `${s.id}->div(${targetNode.id}:${branchIdx})->${destNode.id}`;
+                if (!processedTransitions.has(transKey)) {
+                  processedTransitions.add(transKey);
+                  const receptivity = (targetNode.transitions && targetNode.transitions[branchIdx] && targetNode.transitions[branchIdx].receptivity)
+                    ? targetNode.transitions[branchIdx].receptivity
+                    : `1`;
+
+                  transitions.push({
+                    id: transitions.length + 1,
+                    fromSteps: [s.id],
+                    toSteps: [destNode.id],
+                    receptivity: receptivity
+                  });
+                }
+              }
+            }
           });
+        }
+        // Caso C: Step -> Convergência OR
+        else if (targetNode.type === 'or_convergence') {
+          if (targetNode.outputs && targetNode.outputs.length > 0) {
+            targetNode.outputs.forEach(finalDestId => {
+              const finalDestNode = stepsMap.get(finalDestId);
+              if (finalDestNode && (finalDestNode.type === 'start_step' || finalDestNode.type === 'active_step')) {
+                const transKey = `${s.id}->conv(${targetNode.id})->${finalDestNode.id}`;
+                if (!processedTransitions.has(transKey)) {
+                  processedTransitions.add(transKey);
+                  const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity)
+                    ? s.transitions[0].receptivity
+                    : `I${s.id}`;
+
+                  transitions.push({
+                    id: transitions.length + 1,
+                    fromSteps: [s.id],
+                    toSteps: [finalDestNode.id],
+                    receptivity: receptivity
+                  });
+                }
+              }
+            });
+          }
         }
       });
     }

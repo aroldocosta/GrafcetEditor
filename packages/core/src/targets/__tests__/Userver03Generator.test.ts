@@ -180,6 +180,44 @@ comparats:
 
     expect(output.content).toBe(expected);
   });
+
+  it('deve gerar corretamente equações para Divergência OU e Convergência OU', () => {
+    // Grafcet com Divergência OU a partir da Etapa 1 para Etapa 2 (se I1) ou Etapa 3 (se I2),
+    // e Convergência OU de Etapa 2 (se I3) ou Etapa 3 (se I4) para Etapa 4
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [] },
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 3, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 2 }] },
+        { id: 4, isInitial: false, actions: [] }
+      ],
+      transitions: [
+        // Ramos da Divergência OU a partir do Step 1
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'I1' },
+        { id: 2, fromSteps: [1], toSteps: [3], receptivity: 'I2' },
+        // Ramos da Convergência OU para o Step 4
+        { id: 3, fromSteps: [2], toSteps: [4], receptivity: 'I3' },
+        { id: 4, fromSteps: [3], toSteps: [4], receptivity: 'I4' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM2=M1*I1',
+      'RM1=M1*I1',
+      'SM3=M1*I2',
+      'RM1=M1*I2',
+      'SM4=M2*I3',
+      'RM2=M2*I3',
+      'SM4=M3*I4',
+      'RM3=M3*I4',
+      'XQ1=M2',
+      'XQ2=M3;'
+    ]);
+  });
 });
+
 
 

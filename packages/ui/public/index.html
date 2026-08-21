@@ -29,6 +29,43 @@
       <div class="connector top active"></div>
       <div class="connector bottom active"></div>
     </div>
+
+    <div class="palette-title">Divergência OR</div>
+    <div class="box or_divergence" draggable="true" data-type="or_divergence">
+      <div class="connector top center"></div>
+      <div class="branch-stem-top"></div>
+      <div class="branch-bar"></div>
+      <div class="branch-legs bottom">
+        <div class="branch-leg left">
+          <div class="branch-stem-bottom"></div>
+          <div class="branch-transition" data-branch="0" title="Clique para editar receptividade"></div>
+          <div class="connector bottom" data-branch="0"></div>
+        </div>
+        <div class="branch-leg right">
+          <div class="branch-stem-bottom"></div>
+          <div class="branch-transition" data-branch="1" title="Clique para editar receptividade"></div>
+          <div class="connector bottom" data-branch="1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="palette-title">Convergência OR</div>
+    <div class="box or_convergence" draggable="true" data-type="or_convergence">
+      <div class="branch-legs top">
+        <div class="branch-leg left">
+          <div class="connector top" data-branch="0"></div>
+          <div class="branch-stem-top"></div>
+        </div>
+        <div class="branch-leg right">
+          <div class="connector top" data-branch="1"></div>
+          <div class="branch-stem-top"></div>
+        </div>
+      </div>
+      <div class="branch-bar"></div>
+      <div class="branch-stem-bottom"></div>
+      <div class="connector bottom center"></div>
+    </div>
+
     <button class="palette-btn btn-compile" onclick="doCompile()">COMPILAR</button>
     <button class="palette-btn btn-export" onclick="exportDiagram()">EXPORTAR JSON</button>
     <button class="palette-btn btn-import" onclick="triggerImportDiagram()">IMPORTAR JSON</button>
@@ -58,11 +95,11 @@
     </div>
   </div>
 
-  <script src="step.js?v=3"></script>
-  <script src="transition.js?v=3"></script>
-  <script src="action.js?v=3"></script>
-  <script src="script.js?v=3"></script>
-  <script src="compiler.js?v=3"></script>
+  <script src="step.js?v=7"></script>
+  <script src="transition.js?v=7"></script>
+  <script src="action.js?v=7"></script>
+  <script src="script.js?v=7"></script>
+  <script src="compiler.js?v=7"></script>
 </body>
 
 </html>

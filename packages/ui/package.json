@@ -4,8 +4,8 @@
   "description": "Grafcet Editor Web User Interface",
   "main": "public/index.html",
   "scripts": {
-    "dev": "bun x serve public -p 8080",
-    "start": "bun x serve public -p 8080"
+    "dev": "bun run serve.ts",
+    "start": "bun run serve.ts"
   },
   "dependencies": {
     "@grafcet/core": "workspace:*"
