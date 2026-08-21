@@ -263,25 +263,7 @@ function attachConnectorListeners(box) {
 
         const toX = x;
         const toY = y;
-        let points = "";
-
-        if (currentConnection.from.connector === "bottom" &&
-            connector.classList.contains("top") &&
-            toY < fromY) {
-          const offsetX = Math.min(fromX, toX) - 50;
-          const y1 = fromY + 10;
-          const y2 = toY - 10;
-          points = [
-            `${fromX},${fromY}`,
-            `${fromX},${y1}`,
-            `${offsetX},${y1}`,
-            `${offsetX},${y2}`,
-            `${toX},${y2}`,
-            `${toX},${toY}`
-          ].join(" ");
-        } else {
-          points = `${fromX},${fromY} ${toX},${toY}`;
-        }
+        const points = calculatePolylinePoints(fromX, fromY, toX, toY, currentConnection.from.connector, connector.classList.contains("top") ? "top" : "bottom");
 
         currentConnection.polyline.setAttribute("points", points);
 
@@ -321,7 +303,7 @@ function attachHoverListeners(box) {
         receptivityLabel.className = "receptivity-label";
         receptivityLabel.textContent = "";
         receptivityLabel.style.position = "absolute";
-        receptivityLabel.style.left = "24px";
+        receptivityLabel.style.left = "32px";
         receptivityLabel.style.top = "50%";
         receptivityLabel.style.transform = "translateY(-50%)";
         receptivityLabel.style.fontSize = "13px";
@@ -400,7 +382,7 @@ function attachHoverListeners(box) {
       receptivityLabel.className = "receptivity-label";
       receptivityLabel.textContent = "";
       receptivityLabel.style.position = "absolute";
-      receptivityLabel.style.left = "30px";
+      receptivityLabel.style.left = "32px";
       receptivityLabel.style.top = "50%";
       receptivityLabel.style.transform = "translateY(-50%)";
       receptivityLabel.style.fontSize = "14px";
@@ -461,6 +443,42 @@ function getOrCreateSVG() {
   return svg;
 }
 
+function calculatePolylinePoints(fromX, fromY, toX, toY, fromConnector, toConnector) {
+  if (fromConnector === "bottom" && toConnector === "top" && toY < fromY) {
+    const canvasRect = canvas.getBoundingClientRect();
+    let minLeft = Math.min(fromX, toX);
+
+    const boxes = canvas.querySelectorAll(".box");
+    boxes.forEach(b => {
+      const bRect = b.getBoundingClientRect();
+      const bLeft = bRect.left - canvasRect.left;
+      const bTop = bRect.top - canvasRect.top;
+      const bBottom = bRect.bottom - canvasRect.top;
+
+      if (bBottom >= toY - 40 && bTop <= fromY + 40) {
+        if (bLeft < minLeft) {
+          minLeft = bLeft;
+        }
+      }
+    });
+
+    const offsetX = Math.min(minLeft - 40, Math.min(fromX, toX) - 50);
+    const y1 = fromY + 15;
+    const y2 = toY - 15;
+
+    return [
+      `${fromX},${fromY}`,
+      `${fromX},${y1}`,
+      `${offsetX},${y1}`,
+      `${offsetX},${y2}`,
+      `${toX},${y2}`,
+      `${toX},${toY}`
+    ].join(" ");
+  }
+
+  return `${fromX},${fromY} ${toX},${toY}`;
+}
+
 function updateConnections(box) {
   const rect = canvas.getBoundingClientRect();
   connections.forEach(conn => {
@@ -482,22 +500,7 @@ function updateConnections(box) {
         ? toRect.top - rect.top
         : toRect.bottom - rect.top;
 
-      let points = "";
-      if (conn.from.connector === "bottom" && conn.to.connector === "top" && toY < fromY) {
-        const offsetX = Math.min(fromX, toX) - 50;
-        const y1 = fromY + 10;
-        const y2 = toY - 10;
-        points = [
-          `${fromX},${fromY}`,
-          `${fromX},${y1}`,
-          `${offsetX},${y1}`,
-          `${offsetX},${y2}`,
-          `${toX},${y2}`,
-          `${toX},${toY}`
-        ].join(" ");
-      } else {
-        points = `${fromX},${fromY} ${toX},${toY}`;
-      }
+      const points = calculatePolylinePoints(fromX, fromY, toX, toY, conn.from.connector, conn.to.connector);
 
       conn.polyline.setAttribute("points", points);
     }

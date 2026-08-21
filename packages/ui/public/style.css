@@ -166,11 +166,12 @@
     position: absolute;
     width: 25px;
     height: 6px;
-    background: grey;
+    background: #333;
     top: calc(var(--box_side) - 20px);
     z-index: 1;
-    left: calc(50% - 14%);
+    left: calc(50% - 12.5px);
     cursor: pointer;
+    border: 1px solid #222;
   }
 
   .connected-to-branch .transition {
@@ -232,10 +233,14 @@
 
   .or_convergence .branch-legs.top .branch-stem-top {
     top: 0;
-    height: 30px;
+    height: 45px;
     width: 2px;
     background: #333;
     left: calc(50% - 1px);
+  }
+
+  #palette .or_convergence .branch-legs.top .branch-stem-top {
+    height: 35px;
   }
 
   .branch-stem-bottom {
@@ -299,11 +304,11 @@
 
   .branch-transition {
     position: absolute;
-    width: 20px;
-    height: 5px;
+    width: 25px;
+    height: 6px;
     background: #333;
     top: 18px;
-    left: calc(50% - 10px);
+    left: calc(50% - 12.5px);
     z-index: 2;
     cursor: pointer;
     border: 1px solid #222;
