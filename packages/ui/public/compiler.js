@@ -12,7 +12,25 @@ function buildGrafcetIR(stepsList) {
   // 1. Filtrar e mapear apenas etapas reais (Start e Active)
   const realSteps = stepsList.filter(s => s.type === 'start_step' || s.type === 'active_step');
 
+  // Mapear ID interno para o número visual da etapa (1, 2, 3...)
+  const idToVisualMap = new Map();
+  realSteps.forEach((s, idx) => {
+    let visualNum = idx + 1;
+    if (s.element) {
+      const inner = s.element.querySelector('.inner-rect');
+      if (inner && inner.textContent.trim()) {
+        const parsed = parseInt(inner.textContent.trim(), 10);
+        if (!isNaN(parsed)) visualNum = parsed;
+      }
+    } else if (s.stepNumber !== undefined && !isNaN(Number(s.stepNumber))) {
+      visualNum = Number(s.stepNumber);
+    }
+    idToVisualMap.set(s.id, visualNum);
+  });
+
   realSteps.forEach((s) => {
+    const visualFromId = idToVisualMap.get(s.id) || s.id;
+
     // Converter Ações da UI para o modelo IR
     const irActions = (s.actions || []).map((a) => {
       const qualifier = a.qualifier || (a.type === 'S' ? 'S' : a.type === 'R' ? 'R' : a.type === 'Z' ? 'Z' : a.type === 'T' ? 'T' : 'X');
@@ -35,7 +53,7 @@ function buildGrafcetIR(stepsList) {
     });
 
     steps.push({
-      id: s.id,
+      id: visualFromId,
       isInitial: s.type === 'start_step',
       actions: irActions
     });
@@ -51,14 +69,15 @@ function buildGrafcetIR(stepsList) {
           const transKey = `${s.id}->${targetNode.id}`;
           if (!processedTransitions.has(transKey)) {
             processedTransitions.add(transKey);
+            const toVisualId = idToVisualMap.get(targetNode.id) || targetNode.id;
             const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity) 
               ? s.transitions[0].receptivity 
-              : `I${s.id}`;
+              : `I${visualFromId}`;
 
             transitions.push({
               id: transitions.length + 1,
-              fromSteps: [s.id],
-              toSteps: [targetNode.id],
+              fromSteps: [visualFromId],
+              toSteps: [toVisualId],
               receptivity: receptivity
             });
           }
@@ -74,14 +93,15 @@ function buildGrafcetIR(stepsList) {
                 const transKey = `${s.id}->div(${targetNode.id}:${branchIdx})->${destNode.id}`;
                 if (!processedTransitions.has(transKey)) {
                   processedTransitions.add(transKey);
+                  const destVisualId = idToVisualMap.get(destNode.id) || destNode.id;
                   const receptivity = (targetNode.transitions && targetNode.transitions[branchIdx] && targetNode.transitions[branchIdx].receptivity)
                     ? targetNode.transitions[branchIdx].receptivity
                     : `1`;
 
                   transitions.push({
                     id: transitions.length + 1,
-                    fromSteps: [s.id],
-                    toSteps: [destNode.id],
+                    fromSteps: [visualFromId],
+                    toSteps: [destVisualId],
                     receptivity: receptivity
                   });
                 }
@@ -98,14 +118,15 @@ function buildGrafcetIR(stepsList) {
                 const transKey = `${s.id}->conv(${targetNode.id})->${finalDestNode.id}`;
                 if (!processedTransitions.has(transKey)) {
                   processedTransitions.add(transKey);
+                  const finalDestVisualId = idToVisualMap.get(finalDestNode.id) || finalDestNode.id;
                   const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity)
                     ? s.transitions[0].receptivity
-                    : `I${s.id}`;
+                    : `I${visualFromId}`;
 
                   transitions.push({
                     id: transitions.length + 1,
-                    fromSteps: [s.id],
-                    toSteps: [finalDestNode.id],
+                    fromSteps: [visualFromId],
+                    toSteps: [finalDestVisualId],
                     receptivity: receptivity
                   });
                 }
@@ -116,6 +137,8 @@ function buildGrafcetIR(stepsList) {
       });
     }
   });
+
+  steps.sort((a, b) => a.id - b.id);
 
   return {
     steps: steps,
