@@ -267,6 +267,57 @@ comparats:
       'RM3=M3*I3;'
     ]);
   });
+
+  it('deve gerar corretamente bobinas de temporizador com prefixo XT1 e fluxo completo do diagrama', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        {
+          id: 1,
+          isInitial: true,
+          actions: [
+            { qualifier: 'X', resourceType: 'Q', channel: 1 },
+            { qualifier: 'X', resourceType: 'Q', channel: 2 },
+            { qualifier: 'X', resourceType: 'T', channel: 1 }
+          ]
+        },
+        {
+          id: 2,
+          isInitial: false,
+          actions: [
+            { qualifier: 'X', resourceType: 'Q', channel: 1 }
+          ]
+        },
+        {
+          id: 3,
+          isInitial: false,
+          actions: [
+            { qualifier: 'X', resourceType: 'Q', channel: 2 }
+          ]
+        }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'R1' },
+        { id: 2, fromSteps: [1], toSteps: [3], receptivity: 'R2' },
+        { id: 3, fromSteps: [2], toSteps: [1], receptivity: 'R3' },
+        { id: 4, fromSteps: [3], toSteps: [1], receptivity: 'R4' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM2=M1*R1',
+      'SM3=M1*R2',
+      'SM1=M2*R3+M3*R4',
+      'RM1=M1*R1+M1*R2',
+      'RM2=M2*R3',
+      'RM3=M3*R4',
+      'XQ1=M1+M2',
+      'XQ2=M1+M3',
+      'XT1=M1;'
+    ]);
+  });
 });
 
 

@@ -55,32 +55,33 @@ export class Userver03Generator {
                         channel = parseInt(match[2], 10);
                     }
                 }
-                let coilKey = '';
-                if (qualifier === 'T' || resourceType === 'T') {
-                    coilKey = `T${channel}`;
+                let effectiveQualifier = qualifier;
+                if (qualifier === 'T') {
+                    resourceType = 'T';
+                    effectiveQualifier = 'X';
                 }
-                else {
-                    const coilTarget = `${resourceType}${channel}`;
-                    switch (qualifier) {
-                        case 'X':
-                        case 'P':
-                        case 'N': // Sem Retenção (Normal)
-                            coilKey = `X${coilTarget}`;
-                            break;
-                        case 'S': // Set (Ativa Retenção / Latch)
-                            coilKey = `S${coilTarget}`;
-                            break;
-                        case 'R': // Reset (Desativa Retenção / Unlatch)
-                            coilKey = `R${coilTarget}`;
-                            break;
-                        case 'Z': // Toggle (Inverte Estado)
-                            coilKey = `Z${coilTarget}`;
-                            break;
-                        default:
-                            coilKey = `${qualifier}${coilTarget}`;
-                            break;
-                    }
+                const coilTarget = `${resourceType}${channel}`;
+                let coilPrefix = 'X';
+                switch (effectiveQualifier) {
+                    case 'X':
+                    case 'P':
+                    case 'N': // Sem Retenção (Normal)
+                        coilPrefix = 'X';
+                        break;
+                    case 'S': // Set (Ativa Retenção / Latch)
+                        coilPrefix = 'S';
+                        break;
+                    case 'R': // Reset (Desativa Retenção / Unlatch)
+                        coilPrefix = 'R';
+                        break;
+                    case 'Z': // Toggle (Inverte Estado)
+                        coilPrefix = 'Z';
+                        break;
+                    default:
+                        coilPrefix = effectiveQualifier;
+                        break;
                 }
+                const coilKey = `${coilPrefix}${coilTarget}`;
                 if (!actionsMap.has(coilKey)) {
                     actionsMap.set(coilKey, []);
                 }

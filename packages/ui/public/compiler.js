@@ -213,23 +213,28 @@ function generateUserver03(ir) {
       if (!resourceType) resourceType = 'Q';
       if (channel === undefined || channel === null) channel = 1;
 
-      let coilKey = '';
-      if (q === 'T' || resourceType === 'T') {
-        coilKey = `T${channel}`;
-      } else {
-        const targetStr = `${resourceType}${channel}`;
-        if (q === 'X' || q === 'N' || q === 'P') {
-          coilKey = `X${targetStr}`;
-        } else if (q === 'S') {
-          coilKey = `S${targetStr}`;
-        } else if (q === 'R') {
-          coilKey = `R${targetStr}`;
-        } else if (q === 'Z') {
-          coilKey = `Z${targetStr}`;
-        } else {
-          coilKey = `${q}${targetStr}`;
-        }
+      let effectiveQualifier = q;
+      if (q === 'T') {
+        resourceType = 'T';
+        effectiveQualifier = 'X';
       }
+
+      const targetStr = `${resourceType}${channel}`;
+      let coilPrefix = 'X';
+
+      if (effectiveQualifier === 'X' || effectiveQualifier === 'N' || effectiveQualifier === 'P') {
+        coilPrefix = 'X';
+      } else if (effectiveQualifier === 'S') {
+        coilPrefix = 'S';
+      } else if (effectiveQualifier === 'R') {
+        coilPrefix = 'R';
+      } else if (effectiveQualifier === 'Z') {
+        coilPrefix = 'Z';
+      } else {
+        coilPrefix = effectiveQualifier;
+      }
+
+      const coilKey = `${coilPrefix}${targetStr}`;
 
       if (!actionsMap.has(coilKey)) {
         actionsMap.set(coilKey, []);
