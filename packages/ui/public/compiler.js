@@ -142,21 +142,36 @@ function generateUserver03(ir) {
   const lines = [];
 
   // 1. Equações de Evolução das Etapas (SMn e RMn)
+  const setMap = new Map();
+  const resetMap = new Map();
+
   ir.transitions.forEach((t) => {
     const receptivity = normalizeReceptivity(t.receptivity);
     const fromCond = t.fromSteps.map((id) => `M${id}`).join('*');
     const fullCond = receptivity ? `${fromCond}*${receptivity}` : fromCond;
 
     t.toSteps.forEach((toId) => {
-      lines.push(`SM${toId}=${fullCond}`);
+      if (!setMap.has(toId)) setMap.set(toId, []);
+      setMap.get(toId).push(fullCond);
     });
 
     t.fromSteps.forEach((fromId) => {
-      lines.push(`RM${fromId}=${fullCond}`);
+      if (!resetMap.has(fromId)) resetMap.set(fromId, []);
+      resetMap.get(fromId).push(fullCond);
     });
   });
 
-  // 2. Ações Associadas às Etapas
+  for (const [stepId, conditions] of setMap.entries()) {
+    lines.push(`SM${stepId}=${conditions.join('+')}`);
+  }
+
+  for (const [stepId, conditions] of resetMap.entries()) {
+    lines.push(`RM${stepId}=${conditions.join('+')}`);
+  }
+
+  // 2. Ações Associadas às Etapas (agrupadas por chave de bobina)
+  const actionsMap = new Map();
+
   ir.steps.forEach((s) => {
     const stepMarker = `M${s.id}`;
     (s.actions || []).forEach((a) => {
@@ -175,23 +190,37 @@ function generateUserver03(ir) {
       if (!resourceType) resourceType = 'Q';
       if (channel === undefined || channel === null) channel = 1;
 
-      const targetStr = `${resourceType}${channel}`;
-
-      if (q === 'X' || q === 'N' || q === 'P') {
-        lines.push(`X${targetStr}=${stepMarker}`);
-      } else if (q === 'S') {
-        lines.push(`S${targetStr}=${stepMarker}`);
-      } else if (q === 'R') {
-        lines.push(`R${targetStr}=${stepMarker}`);
-      } else if (q === 'Z') {
-        lines.push(`Z${targetStr}=${stepMarker}`);
-      } else if (q === 'T') {
-        lines.push(`T${channel}=${stepMarker}`);
+      let coilKey = '';
+      if (q === 'T' || resourceType === 'T') {
+        coilKey = `T${channel}`;
       } else {
-        lines.push(`${q}${targetStr}=${stepMarker}`);
+        const targetStr = `${resourceType}${channel}`;
+        if (q === 'X' || q === 'N' || q === 'P') {
+          coilKey = `X${targetStr}`;
+        } else if (q === 'S') {
+          coilKey = `S${targetStr}`;
+        } else if (q === 'R') {
+          coilKey = `R${targetStr}`;
+        } else if (q === 'Z') {
+          coilKey = `Z${targetStr}`;
+        } else {
+          coilKey = `${q}${targetStr}`;
+        }
+      }
+
+      if (!actionsMap.has(coilKey)) {
+        actionsMap.set(coilKey, []);
+      }
+      const stepList = actionsMap.get(coilKey);
+      if (!stepList.includes(stepMarker)) {
+        stepList.push(stepMarker);
       }
     });
   });
+
+  for (const [coilKey, stepMarkers] of actionsMap.entries()) {
+    lines.push(`${coilKey}=${stepMarkers.join('+')}`);
+  }
 
   // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
   const timersMap = new Map();

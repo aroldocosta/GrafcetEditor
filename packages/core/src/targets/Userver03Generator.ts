@@ -11,6 +11,9 @@ export class Userver03Generator implements ICodeGenerator {
     const lines: string[] = [];
 
     // 1. Processar Transições e Evolução de Etapas (Set e Reset das memórias Mn)
+    const setMap = new Map<number, string[]>();
+    const resetMap = new Map<number, string[]>();
+
     for (const transition of ir.transitions) {
       const normalizedReceptivity = this.normalizeReceptivity(transition.receptivity);
       
@@ -25,16 +28,30 @@ export class Userver03Generator implements ICodeGenerator {
 
       // Ativação das etapas de destino (Set M_to)
       for (const toStepId of transition.toSteps) {
-        lines.push(`SM${toStepId}=${fullCondition}`);
+        if (!setMap.has(toStepId)) setMap.set(toStepId, []);
+        setMap.get(toStepId)!.push(fullCondition);
       }
 
       // Desativação das etapas de origem (Reset M_from)
       for (const fromStepId of transition.fromSteps) {
-        lines.push(`RM${fromStepId}=${fullCondition}`);
+        if (!resetMap.has(fromStepId)) resetMap.set(fromStepId, []);
+        resetMap.get(fromStepId)!.push(fullCondition);
       }
     }
 
-    // 2. Processar Ações associadas a cada Etapa
+    // Adicionar equações de ativação de etapas (SMn)
+    for (const [stepId, conditions] of setMap.entries()) {
+      lines.push(`SM${stepId}=${conditions.join('+')}`);
+    }
+
+    // Adicionar equações de desativação de etapas (RMn)
+    for (const [stepId, conditions] of resetMap.entries()) {
+      lines.push(`RM${stepId}=${conditions.join('+')}`);
+    }
+
+    // 2. Processar Ações associadas a cada Etapa (agrupadas por chave de bobina)
+    const actionsMap = new Map<string, string[]>();
+
     for (const step of ir.steps) {
       const stepMarker = `M${step.id}`;
       
@@ -53,36 +70,49 @@ export class Userver03Generator implements ICodeGenerator {
           }
         }
 
-        const coilTarget = `${resourceType}${channel}`;
+        let coilKey = '';
+        if (qualifier === 'T' || resourceType === 'T') {
+          coilKey = `T${channel}`;
+        } else {
+          const coilTarget = `${resourceType}${channel}`;
+          switch (qualifier) {
+            case 'X':
+            case 'P':
+            case 'N': // Sem Retenção (Normal)
+              coilKey = `X${coilTarget}`;
+              break;
 
-        switch (qualifier) {
-          case 'X':
-          case 'P':
-          case 'N': // Sem Retenção (Normal)
-            lines.push(`X${coilTarget}=${stepMarker}`);
-            break;
+            case 'S': // Set (Ativa Retenção / Latch)
+              coilKey = `S${coilTarget}`;
+              break;
 
-          case 'S': // Set (Ativa Retenção / Latch)
-            lines.push(`S${coilTarget}=${stepMarker}`);
-            break;
+            case 'R': // Reset (Desativa Retenção / Unlatch)
+              coilKey = `R${coilTarget}`;
+              break;
 
-          case 'R': // Reset (Desativa Retenção / Unlatch)
-            lines.push(`R${coilTarget}=${stepMarker}`);
-            break;
+            case 'Z': // Toggle (Inverte Estado)
+              coilKey = `Z${coilTarget}`;
+              break;
 
-          case 'Z': // Toggle (Inverte Estado)
-            lines.push(`Z${coilTarget}=${stepMarker}`);
-            break;
+            default:
+              coilKey = `${qualifier}${coilTarget}`;
+              break;
+          }
+        }
 
-          case 'T': // Ativação Temporizada
-            lines.push(`T${coilTarget}=${stepMarker}`);
-            break;
-
-          default:
-            lines.push(`${qualifier}${coilTarget}=${stepMarker}`);
-            break;
+        if (!actionsMap.has(coilKey)) {
+          actionsMap.set(coilKey, []);
+        }
+        const stepList = actionsMap.get(coilKey)!;
+        if (!stepList.includes(stepMarker)) {
+          stepList.push(stepMarker);
         }
       }
+    }
+
+    // Adicionar equações de bobinas unificadas
+    for (const [coilKey, stepMarkers] of actionsMap.entries()) {
+      lines.push(`${coilKey}=${stepMarkers.join('+')}`);
     }
 
     // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)

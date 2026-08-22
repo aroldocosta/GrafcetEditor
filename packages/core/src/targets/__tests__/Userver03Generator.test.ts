@@ -158,13 +158,12 @@ describe('Userver03Generator', () => {
     const expected = 
 `lines:
   SM2=M1*1,
-  RM1=M1*1,
   SM3=M2*T1,
-  RM2=M2*T1,
   SM1=M3*T2,
+  RM1=M1*1,
+  RM2=M2*T1,
   RM3=M3*T2,
-  XQ1=M2,
-  XQ1=M3;
+  XQ1=M2+M3;
 timers:
   {id: 1, funct: 1, preset: 5, offset: 0},
   {id: 2, funct: 1, preset: 5, offset: 0},
@@ -181,7 +180,7 @@ comparats:
     expect(output.content).toBe(expected);
   });
 
-  it('deve gerar corretamente equações para Divergência OU e Convergência OU', () => {
+  it('deve unificar equações em linha única para Convergência OU e Divergência OU', () => {
     // Grafcet com Divergência OU a partir da Etapa 1 para Etapa 2 (se I1) ou Etapa 3 (se I2),
     // e Convergência OU de Etapa 2 (se I3) ou Etapa 3 (se I4) para Etapa 4
     const ir: GrafcetIR = {
@@ -206,15 +205,66 @@ comparats:
 
     expect(config.lines).toEqual([
       'SM2=M1*I1',
-      'RM1=M1*I1',
       'SM3=M1*I2',
-      'RM1=M1*I2',
-      'SM4=M2*I3',
+      'SM4=M2*I3+M3*I4',
+      'RM1=M1*I1+M1*I2',
       'RM2=M2*I3',
-      'SM4=M3*I4',
       'RM3=M3*I4',
       'XQ1=M2',
       'XQ2=M3;'
+    ]);
+  });
+
+  it('deve unificar bobinas (X, S, R, Z) acionadas por múltiplas etapas em uma única linha (ex: XQ1=M1+M2)', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 3, isInitial: false, actions: [
+          { qualifier: 'S', resourceType: 'M', channel: 5 },
+          { qualifier: 'Z', resourceType: 'Q', channel: 2 }
+        ]},
+        { id: 4, isInitial: false, actions: [
+          { qualifier: 'S', resourceType: 'M', channel: 5 },
+          { qualifier: 'Z', resourceType: 'Q', channel: 2 }
+        ]}
+      ],
+      transitions: []
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'XQ1=M1+M2',
+      'SM5=M3+M4',
+      'ZQ2=M3+M4;'
+    ]);
+  });
+
+  it('deve gerar corretamente convergência OU retornando à etapa inicial (ex: SM1=M2*I2+M3*I3)', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [] },
+        { id: 2, isInitial: false, actions: [] },
+        { id: 3, isInitial: false, actions: [] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'I1' },
+        { id: 2, fromSteps: [2], toSteps: [1], receptivity: 'I2' },
+        { id: 3, fromSteps: [3], toSteps: [1], receptivity: 'I3' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM2=M1*I1',
+      'SM1=M2*I2+M3*I3',
+      'RM1=M1*I1',
+      'RM2=M2*I2',
+      'RM3=M3*I3;'
     ]);
   });
 });
