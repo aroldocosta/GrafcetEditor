@@ -4,13 +4,13 @@ export class ReceptivityValidator {
      * DIGITAL_QTY = 8 (I1-I8 ou E1-E8)
      * RELAY_QTY = 8 (Q1-Q8)
      * REMOTE_QTY = 8 (R1-R8)
-     * MEMORY_QTY = 64 (M1-M64 ou X1-X64)
+     * MEMORY_QTY = 128 (M1-M128 ou X1-X128)
      * TIMER_QTY = 16 (T1-T16)
      * COUNTER_QTY = 8 (C1-C8)
      * COMPARATOR_QTY = 8 (A1-A8)
      * CONSTANTES = 1 (True) ou 0 (False)
      */
-    static HARDWARE_PATTERN = /^(I[1-8]|E[1-8]|Q[1-8]|R[1-8]|M([1-9]|[1-5][0-9]|6[0-4])|X([1-9]|[1-5][0-9]|6[0-4])|T([1-9]|1[0-6])|C[1-8]|A[1-8]|1|0)$/i;
+    static HARDWARE_PATTERN = /^(I[1-8]|E[1-8]|Q[1-8]|R[1-8]|M([1-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])|X([1-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])|T([1-9]|1[0-6])|C[1-8]|A[1-8]|1|0)$/i;
     static normalize(expression) {
         if (!expression)
             return '';
@@ -49,7 +49,7 @@ export class ReceptivityValidator {
             }
             else {
                 if (!this.HARDWARE_PATTERN.test(token)) {
-                    errors.push(`Identificador '${token}' está fora dos limites de hardware permitidos (I1-I8, Q1-Q8, R1-R8, M1-M64, T1-T16, C1-C8, A1-A8, 1, 0).`);
+                    errors.push(`Identificador '${token}' está fora dos limites de hardware permitidos (I1-I8, Q1-Q8, R1-R8, M1-M128, T1-T16, C1-C8, A1-A8, 1, 0).`);
                 }
                 else {
                     validatedTokens.push(token.toUpperCase());

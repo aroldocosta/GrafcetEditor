@@ -26,12 +26,12 @@ describe('ReceptivityValidator', () => {
     expect(ReceptivityValidator.validate('A9').isValid).toBe(false);
   });
 
-  it('deve aceitar memórias de M1 a M64', () => {
+  it('deve aceitar memórias de M1 a M128', () => {
     expect(ReceptivityValidator.validate('M1').isValid).toBe(true);
-    expect(ReceptivityValidator.validate('M64').isValid).toBe(true);
+    expect(ReceptivityValidator.validate('M128').isValid).toBe(true);
 
-    // Fora do limite de 64
-    expect(ReceptivityValidator.validate('M65').isValid).toBe(false);
+    // Fora do limite de 128
+    expect(ReceptivityValidator.validate('M129').isValid).toBe(false);
   });
 
   it('deve validar expressões lógicas complexas com parênteses e operadores *, +, !', () => {

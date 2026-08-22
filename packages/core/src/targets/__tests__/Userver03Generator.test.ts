@@ -5,7 +5,7 @@ import { GrafcetIR } from '../../ir/GrafcetIR.js';
 describe('Userver03Generator', () => {
   const generator = new Userver03Generator();
 
-  it('deve gerar expressões booleanas corretas para um Grafcet sequencial simples', () => {
+  it('deve gerar expressões booleanas corretas para um Grafcet sequencial simples com boot M128', () => {
     const ir: GrafcetIR = {
       steps: [
         { id: 1, isInitial: true, actions: [] },
@@ -20,9 +20,11 @@ describe('Userver03Generator', () => {
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128',
       'SM2=M1*I1',
       'RM1=M1*I1',
-      'XQ1=M2;'
+      'XQ1=M2',
+      'SM128=1;'
     ]);
   });
 
@@ -46,7 +48,8 @@ describe('Userver03Generator', () => {
 
     expect(config.lines).toEqual([
       'SM5=M2',
-      'ZQ2=M2;'
+      'ZQ2=M2',
+      'SM128=1;'
     ]);
   });
 
@@ -64,8 +67,12 @@ describe('Userver03Generator', () => {
     const output = generator.generate(ir);
     const config = output.metadata?.config;
 
-    expect(config.lines[0]).toBe('SM2=M1*I1*!I2');
-    expect(config.lines[1]).toBe('RM1=M1*I1*!I2;');
+    expect(config.lines).toEqual([
+      'SM1=!M128',
+      'SM2=M1*I1*!I2',
+      'RM1=M1*I1*!I2',
+      'SM128=1;'
+    ]);
   });
 
   it('deve suportar divergência em E (ativação paralela de etapas)', () => {
@@ -84,9 +91,11 @@ describe('Userver03Generator', () => {
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128',
       'SM2=M1*I1',
       'SM3=M1*I1',
-      'RM1=M1*I1;'
+      'RM1=M1*I1',
+      'SM128=1;'
     ]);
   });
 
@@ -157,13 +166,14 @@ describe('Userver03Generator', () => {
     const output = generator.generate(ir);
     const expected = 
 `lines:
+  SM1=!M128+M3*T2,
   SM2=M1*1,
   SM3=M2*T1,
-  SM1=M3*T2,
   RM1=M1*1,
   RM2=M2*T1,
   RM3=M3*T2,
-  XQ1=M2+M3;
+  XQ1=M2+M3,
+  SM128=1;
 timers:
   {id: 1, funct: 1, preset: 5, offset: 0},
   {id: 2, funct: 1, preset: 5, offset: 0},
@@ -181,8 +191,6 @@ comparats:
   });
 
   it('deve unificar equações em linha única para Convergência OU e Divergência OU', () => {
-    // Grafcet com Divergência OU a partir da Etapa 1 para Etapa 2 (se I1) ou Etapa 3 (se I2),
-    // e Convergência OU de Etapa 2 (se I3) ou Etapa 3 (se I4) para Etapa 4
     const ir: GrafcetIR = {
       steps: [
         { id: 1, isInitial: true, actions: [] },
@@ -191,10 +199,8 @@ comparats:
         { id: 4, isInitial: false, actions: [] }
       ],
       transitions: [
-        // Ramos da Divergência OU a partir do Step 1
         { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'I1' },
         { id: 2, fromSteps: [1], toSteps: [3], receptivity: 'I2' },
-        // Ramos da Convergência OU para o Step 4
         { id: 3, fromSteps: [2], toSteps: [4], receptivity: 'I3' },
         { id: 4, fromSteps: [3], toSteps: [4], receptivity: 'I4' }
       ]
@@ -204,6 +210,7 @@ comparats:
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128',
       'SM2=M1*I1',
       'SM3=M1*I2',
       'SM4=M2*I3+M3*I4',
@@ -211,7 +218,8 @@ comparats:
       'RM2=M2*I3',
       'RM3=M3*I4',
       'XQ1=M2',
-      'XQ2=M3;'
+      'XQ2=M3',
+      'SM128=1;'
     ]);
   });
 
@@ -236,13 +244,15 @@ comparats:
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128',
       'XQ1=M1+M2',
       'SM5=M3+M4',
-      'ZQ2=M3+M4;'
+      'ZQ2=M3+M4',
+      'SM128=1;'
     ]);
   });
 
-  it('deve gerar corretamente convergência OU retornando à etapa inicial (ex: SM1=M2*I2+M3*I3)', () => {
+  it('deve gerar corretamente convergência OU retornando à etapa inicial com boot M128', () => {
     const ir: GrafcetIR = {
       steps: [
         { id: 1, isInitial: true, actions: [] },
@@ -260,11 +270,12 @@ comparats:
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128+M2*I2+M3*I3',
       'SM2=M1*I1',
-      'SM1=M2*I2+M3*I3',
       'RM1=M1*I1',
       'RM2=M2*I2',
-      'RM3=M3*I3;'
+      'RM3=M3*I3',
+      'SM128=1;'
     ]);
   });
 
@@ -307,16 +318,28 @@ comparats:
     const config = output.metadata?.config;
 
     expect(config.lines).toEqual([
+      'SM1=!M128+M2*R3+M3*R4',
       'SM2=M1*R1',
       'SM3=M1*R2',
-      'SM1=M2*R3+M3*R4',
       'RM1=M1*R1+M1*R2',
       'RM2=M2*R3',
       'RM3=M3*R4',
       'XQ1=M1+M2',
       'XQ2=M1+M3',
-      'XT1=M1;'
+      'XT1=M1',
+      'SM128=1;'
     ]);
+  });
+
+  it('deve lançar erro se alguma etapa ultrapassar o limite de 127 memórias', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 128, isInitial: false, actions: [] }
+      ],
+      transitions: []
+    };
+
+    expect(() => generator.generate(ir)).toThrow(/Limite de memória excedido/);
   });
 });
 

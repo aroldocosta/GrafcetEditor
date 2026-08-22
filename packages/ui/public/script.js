@@ -55,6 +55,14 @@ function handleCanvasDrop(e) {
   }
   if (!type || typeof type !== "string") return;
 
+  if (type === "start_step" || type === "active_step") {
+    const realStepsCount = stepsList.filter(s => s.type === "start_step" || s.type === "active_step").length;
+    if (realStepsCount >= 127) {
+      alert("Limite de 127 memórias para etapas atingido! A memória M128 é reservada para a inicialização direta do sistema.");
+      return;
+    }
+  }
+
   const template = palette.querySelector(`.${type}`);
   if (!template) return;
 
@@ -716,7 +724,7 @@ function validateReceptivityJS(expr) {
     .replace(/NOT/gi, '!')
     .replace(/~/g, '!');
 
-  const hwPattern = /^(I[1-8]|E[1-8]|Q[1-8]|R[1-8]|M([1-9]|[1-5][0-9]|6[0-4])|X([1-9]|[1-5][0-9]|6[0-4])|T([1-9]|1[0-6])|C[1-8]|A[1-8]|1|0)$/i;
+  const hwPattern = /^(I[1-8]|E[1-8]|Q[1-8]|R[1-8]|M([1-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])|X([1-9]|[1-9][0-9]|1[0-1][0-9]|12[0-8])|T([1-9]|1[0-6])|C[1-8]|A[1-8]|1|0)$/i;
 
   const rawTokens = normalized.match(/([a-zA-Z]+\d+|\d+|[+*!()])/g) || [];
   const fullReconstructed = rawTokens.join('');
@@ -729,7 +737,7 @@ function validateReceptivityJS(expr) {
   for (const tok of rawTokens) {
     if (!/^[+*!()]$/.test(tok)) {
       if (!hwPattern.test(tok)) {
-        errors.push(`Identificador '${tok}' fora dos limites de hardware (I1-I8, Q1-Q8, R1-R8, M1-M64, T1-T16, C1-C8, A1-A8, 1, 0).`);
+        errors.push(`Identificador '${tok}' fora dos limites de hardware (I1-I8, Q1-Q8, R1-R8, M1-M128, T1-T16, C1-C8, A1-A8, 1, 0).`);
       }
     }
   }

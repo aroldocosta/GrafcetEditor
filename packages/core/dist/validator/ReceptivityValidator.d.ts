@@ -10,7 +10,7 @@ export declare class ReceptivityValidator {
      * DIGITAL_QTY = 8 (I1-I8 ou E1-E8)
      * RELAY_QTY = 8 (Q1-Q8)
      * REMOTE_QTY = 8 (R1-R8)
-     * MEMORY_QTY = 64 (M1-M64 ou X1-X64)
+     * MEMORY_QTY = 128 (M1-M128 ou X1-X128)
      * TIMER_QTY = 16 (T1-T16)
      * COUNTER_QTY = 8 (C1-C8)
      * COMPARATOR_QTY = 8 (A1-A8)

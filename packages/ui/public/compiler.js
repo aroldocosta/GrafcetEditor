@@ -164,9 +164,24 @@ function normalizeReceptivity(receptivity) {
 function generateUserver03(ir) {
   const lines = [];
 
+  // 0. Validar limite de 127 memórias
+  for (const s of ir.steps) {
+    if (s.id > 127) {
+      alert(`Limite de memória excedido: Etapa ${s.id} ultrapassa o limite máximo de 127 memórias (M128 é reservada para inicialização direta).`);
+      throw new Error(`Limite de memória excedido: Etapa ${s.id} > 127.`);
+    }
+  }
+
   // 1. Equações de Evolução das Etapas (SMn e RMn)
   const setMap = new Map();
   const resetMap = new Map();
+
+  // Inicializar etapas do tipo Start com o termo de boot '!M128'
+  ir.steps.forEach((s) => {
+    if (s.isInitial) {
+      setMap.set(s.id, ['!M128']);
+    }
+  });
 
   ir.transitions.forEach((t) => {
     const receptivity = normalizeReceptivity(t.receptivity);
@@ -249,6 +264,9 @@ function generateUserver03(ir) {
   for (const [coilKey, stepMarkers] of actionsMap.entries()) {
     lines.push(`${coilKey}=${stepMarkers.join('+')}`);
   }
+
+  // Adicionar retenção da memória auxiliar de inicialização direta (M128) sempre na última linha
+  lines.push('SM128=1');
 
   // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
   const timersMap = new Map();

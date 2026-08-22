@@ -10,9 +10,26 @@ export class Userver03Generator implements ICodeGenerator {
   public generate(ir: GrafcetIR): GeneratedOutput {
     const lines: string[] = [];
 
+    // 0. Validar limite de 127 memórias para etapas (M128 é reservada para inicialização de boot)
+    for (const step of ir.steps) {
+      if (step.id > 127) {
+        throw new Error(`Limite de memória excedido: Etapa ${step.id} ultrapassa o limite máximo de 127 memórias (M128 é reservada para inicialização direta).`);
+      }
+    }
+    if (ir.steps.length > 127) {
+      throw new Error(`Limite de memória excedido: O Grafcet possui ${ir.steps.length} etapas, ultrapassando o limite máximo de 127 memórias.`);
+    }
+
     // 1. Processar Transições e Evolução de Etapas (Set e Reset das memórias Mn)
     const setMap = new Map<number, string[]>();
     const resetMap = new Map<number, string[]>();
+
+    // Inicializar etapas do tipo Start com o termo de boot '!M128'
+    for (const step of ir.steps) {
+      if (step.isInitial) {
+        setMap.set(step.id, ['!M128']);
+      }
+    }
 
     for (const transition of ir.transitions) {
       const normalizedReceptivity = this.normalizeReceptivity(transition.receptivity);
@@ -119,6 +136,9 @@ export class Userver03Generator implements ICodeGenerator {
     for (const [coilKey, stepMarkers] of actionsMap.entries()) {
       lines.push(`${coilKey}=${stepMarkers.join('+')}`);
     }
+
+    // Adicionar retenção da memória auxiliar de inicialização direta (M128) sempre na última linha
+    lines.push('SM128=1');
 
     // 3. Coletar e agrupar parâmetros de recursos T (Timer), C (Contador), A (Comparador Analógico)
     const timersMap = new Map<number, { id: number; funct: number; preset: number; offset: number }>();
