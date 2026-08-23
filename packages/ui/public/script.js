@@ -244,8 +244,8 @@ function attachConnectorListeners(box) {
 
         currentConnection = {
           polyline,
-          from: { 
-            box, 
+          from: {
+            box,
             connector: connector.classList.contains("top") ? "top" : "bottom",
             branch: connBranch
           },
@@ -277,8 +277,8 @@ function attachConnectorListeners(box) {
 
         const newConn = {
           ...currentConnection,
-          to: { 
-            box, 
+          to: {
+            box,
             connector: connector.classList.contains("top") ? "top" : "bottom",
             branch: connBranch
           }
@@ -360,7 +360,7 @@ function attachHoverListeners(box) {
       }, 320);
     });
   }
-  
+
   const transitionBar = box.querySelector(".transition");
   if (transitionBar) {
     transitionBar.addEventListener("mouseenter", () => {
@@ -373,7 +373,7 @@ function attachHoverListeners(box) {
     transitionBar.addEventListener("click", (e) => {
       e.stopPropagation();
       if (shouldIgnoreClickDueToMove(box)) return;
-    
+
       const stepId = parseInt(box.getAttribute("data-id"));
       const step = stepsList.find(s => s.id === stepId);
       if (!step || !step.transitions || step.transitions.length === 0) {
@@ -581,7 +581,7 @@ function removeStepConnection(connection) {
 
   // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência
   if (fromStep.type === "start_step" || fromStep.type === "active_step") {
-    const stillConnectedToDiv = connections.some(c => 
+    const stillConnectedToDiv = connections.some(c =>
       c !== connection && c.from?.box === fromBox && c.to?.box?.classList.contains("or_divergence")
     );
     if (!stillConnectedToDiv) {
@@ -685,7 +685,7 @@ function updateStepsView() {
             <strong>Canal:</strong> ${c}<br>
             <strong>Descrição:</strong> ${action.description || "-"}
           `;
-          tooltip.style.left = (parseFloat(box.style.left) + 110) + "px";
+          tooltip.style.left = (parseFloat(box.style.left) + 65) + "px";
           tooltip.style.top = (parseFloat(box.style.top) - 5) + "px";
           canvas.appendChild(tooltip);
         });
@@ -701,11 +701,11 @@ function updateStepsView() {
 
     // Atualizar transições
     step.transitions.forEach(t => {
-      if(step.state === "active" && t.triggered) {
+      if (step.state === "active" && t.triggered) {
         t.triggered = false;
         step.state = "inactive";
         step.outputs.forEach(stepId => {
-            stepsList[stepId-1].state = "active";
+          stepsList[stepId - 1].state = "active";
         });
       }
     });
@@ -714,7 +714,7 @@ function updateStepsView() {
 
 function validateReceptivityJS(expr) {
   if (!expr || expr.trim() === '') return { isValid: true, normalized: '1', errors: [] };
-  
+
   const normalized = expr
     .replace(/\s+/g, '')
     .replace(/AND/gi, '*')
@@ -751,8 +751,8 @@ function validateReceptivityJS(expr) {
   if (parenDepth > 0) errors.push(`Há ${parenDepth} parêntese(s) '(' não fechados.`);
 
   for (let i = 0; i < rawTokens.length - 1; i++) {
-    if (/^[+*]$/.test(rawTokens[i]) && /^[+*]$/.test(rawTokens[i+1])) {
-      errors.push(`Operadores duplos consecutivos: '${rawTokens[i]}${rawTokens[i+1]}'.`);
+    if (/^[+*]$/.test(rawTokens[i]) && /^[+*]$/.test(rawTokens[i + 1])) {
+      errors.push(`Operadores duplos consecutivos: '${rawTokens[i]}${rawTokens[i + 1]}'.`);
     }
   }
 
@@ -858,13 +858,13 @@ function showReceptivityModal(transition, transitionBar) {
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     const val = input.value;
-    
-    const needSpaceBefore = /^[+*]$/.test(textToInsert) && start > 0 && val[start-1] !== ' ';
+
+    const needSpaceBefore = /^[+*]$/.test(textToInsert) && start > 0 && val[start - 1] !== ' ';
     const needSpaceAfter = /^[+*]$/.test(textToInsert);
 
     const formattedInsert = (needSpaceBefore ? ' ' : '') + textToInsert + (needSpaceAfter ? ' ' : '');
     input.value = val.substring(0, start) + formattedInsert + val.substring(end);
-    
+
     const newPos = start + formattedInsert.length;
     input.setSelectionRange(newPos, newPos);
     input.focus();
@@ -1028,7 +1028,7 @@ function showActionsModal(step) {
       <input type="text" class="action-description" placeholder="Descrição da Ação" value="${action.description || ''}" style="height: 32px; flex: 1; margin: 0 !important; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-size: 0.88rem; background: #fff; vertical-align: middle;">
 
       <!-- 6. Botão de Parâmetros de Recursos T, C, A -->
-      <button class="btn-config-param" title="Configurar Parâmetros (fun, pst, ofs)" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; display: ${['T','C','A'].includes(resourceType) ? 'inline-flex' : 'none'}; align-items: center; justify-content: center; vertical-align: middle;">⚙️</button>
+      <button class="btn-config-param" title="Configurar Parâmetros (fun, pst, ofs)" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; display: ${['T', 'C', 'A'].includes(resourceType) ? 'inline-flex' : 'none'}; align-items: center; justify-content: center; vertical-align: middle;">⚙️</button>
 
       <button class="remove-action" style="height: 32px; width: 32px; min-width: 32px; margin: 0; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">X</button>
     `;
