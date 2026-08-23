@@ -20,6 +20,8 @@ palette.querySelectorAll(".box").forEach(box => {
     else if (box.classList.contains("active_step")) type = "active_step";
     else if (box.classList.contains("or_divergence")) type = "or_divergence";
     else if (box.classList.contains("or_convergence")) type = "or_convergence";
+    else if (box.classList.contains("and_divergence")) type = "and_divergence";
+    else if (box.classList.contains("and_convergence")) type = "and_convergence";
 
     _draggedType = type;
 
@@ -33,15 +35,9 @@ palette.querySelectorAll(".box").forEach(box => {
     clone.style.position = "absolute";
     clone.style.top = "-1000px";
     clone.style.left = "-1000px";
-    clone.style.pointerEvents = "none";
     document.body.appendChild(clone);
-
-    const rect = clone.getBoundingClientRect();
-    const offsetX = rect.width / 2;
-    const offsetY = rect.height / 2;
-
-    if (e.dataTransfer && e.dataTransfer.setDragImage) {
-      e.dataTransfer.setDragImage(clone, offsetX, offsetY);
+    if (e.dataTransfer) {
+      e.dataTransfer.setDragImage(clone, 50, 30);
     }
     setTimeout(() => document.body.removeChild(clone), 0);
   });
@@ -67,7 +63,7 @@ function handleCanvasDrop(e) {
   if (!template) return;
 
   const rect = canvas.getBoundingClientRect();
-  const isBranch = type === "or_divergence" || type === "or_convergence";
+  const isBranch = type === "or_divergence" || type === "or_convergence" || type === "and_divergence" || type === "and_convergence";
   const boxWidth = isBranch ? 360 : 100;
   const left = e.clientX - rect.left - (boxWidth / 2);
   const top = e.clientY - rect.top - 30;
@@ -102,6 +98,10 @@ function handleCanvasDrop(e) {
     step.transitions = [
       new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 1' }),
       new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 2' })
+    ];
+  } else if (type === "and_divergence" || type === "and_convergence") {
+    step.transitions = [
+      new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Transição Comum' })
     ];
   } else if (type === "or_convergence") {
     step.transitions = [];
@@ -299,8 +299,10 @@ function attachConnectorListeners(box) {
 function attachHoverListeners(box) {
   const isOrDiv = box.classList.contains("or_divergence");
   const isOrConv = box.classList.contains("or_convergence");
+  const isAndDiv = box.classList.contains("and_divergence");
+  const isAndConv = box.classList.contains("and_convergence");
 
-  if (isOrDiv) {
+  if (isOrDiv || isAndDiv || isAndConv) {
     const branchTransitions = box.querySelectorAll(".branch-transition");
     branchTransitions.forEach(bt => {
       const branchIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
@@ -435,9 +437,12 @@ function attachRemoveListener(box) {
 }
 
 function renumberBoxes() {
-  const boxes = [...canvas.querySelectorAll(".box:not(.or_divergence):not(.or_convergence)")];
+  const boxes = [...canvas.querySelectorAll(".box:not(.or_divergence):not(.or_convergence):not(.and_divergence):not(.and_convergence)")];
   boxes.forEach((box, index) => {
     const inner = box.querySelector(".inner-rect");
+    if (inner) inner.textContent = index + 1;
+  });
+}
     if (inner) inner.textContent = index + 1;
   });
 }
@@ -531,22 +536,22 @@ function addStepConnection(fromBox, toBox, fromBranch, toBranch) {
     toStep.inputs.push(fromStep.id);
   }
 
-  // Mapear saídas por ramo na divergência OR
-  if (fromStep.type === "or_divergence") {
+  // Mapear saídas por ramo na divergência OR ou AND
+  if (fromStep.type === "or_divergence" || fromStep.type === "and_divergence") {
     fromStep.branchOutputs = fromStep.branchOutputs || {};
     const b = (fromBranch !== null && fromBranch !== undefined && fromBranch !== "") ? String(fromBranch) : "0";
     fromStep.branchOutputs[b] = toStep.id;
   }
 
-  // Mapear entradas por ramo na convergência OR
-  if (toStep.type === "or_convergence") {
+  // Mapear entradas por ramo na convergência OR ou AND
+  if (toStep.type === "or_convergence" || toStep.type === "and_convergence") {
     toStep.branchInputs = toStep.branchInputs || {};
     const b = (toBranch !== null && toBranch !== undefined && toBranch !== "") ? String(toBranch) : "0";
     toStep.branchInputs[b] = fromStep.id;
   }
 
-  // Ocultar transição do step se conectado à divergência OR
-  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && toStep.type === "or_divergence") {
+  // Ocultar transição do step se conectado à divergência OR ou AND
+  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && (toStep.type === "or_divergence" || toStep.type === "and_divergence")) {
     fromBox.classList.add("connected-to-branch");
   }
 }
@@ -567,13 +572,13 @@ function removeStepConnection(connection) {
   fromStep.outputs = fromStep.outputs.filter(id => id !== toId);
   toStep.inputs = toStep.inputs.filter(id => id !== fromId);
 
-  if (fromStep.type === "or_divergence" && fromStep.branchOutputs) {
+  if ((fromStep.type === "or_divergence" || fromStep.type === "and_divergence") && fromStep.branchOutputs) {
     for (const [k, v] of Object.entries(fromStep.branchOutputs)) {
       if (v === toStep.id) delete fromStep.branchOutputs[k];
     }
   }
 
-  if (toStep.type === "or_convergence" && toStep.branchInputs) {
+  if ((toStep.type === "or_convergence" || toStep.type === "and_convergence") && toStep.branchInputs) {
     for (const [k, v] of Object.entries(toStep.branchInputs)) {
       if (v === fromStep.id) delete toStep.branchInputs[k];
     }
@@ -582,7 +587,7 @@ function removeStepConnection(connection) {
   // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência
   if (fromStep.type === "start_step" || fromStep.type === "active_step") {
     const stillConnectedToDiv = connections.some(c =>
-      c !== connection && c.from?.box === fromBox && c.to?.box?.classList.contains("or_divergence")
+      c !== connection && c.from?.box === fromBox && (c.to?.box?.classList.contains("or_divergence") || c.to?.box?.classList.contains("and_divergence"))
     );
     if (!stillConnectedToDiv) {
       fromBox.classList.remove("connected-to-branch");
@@ -1385,13 +1390,27 @@ function restoreDiagram(data) {
     }
 
     // Atualizar label da receptividade se houver
-    if (sData.type === "or_divergence") {
+    if (sData.type === "or_divergence" || sData.type === "and_divergence" || sData.type === "and_convergence") {
       const branchTransitions = clone.querySelectorAll(".branch-transition");
       branchTransitions.forEach(bt => {
         const bIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
         if (step.transitions[bIdx] && step.transitions[bIdx].receptivity) {
-          const rLabel = bt.querySelector(".receptivity-label");
-          if (rLabel) rLabel.textContent = step.transitions[bIdx].receptivity;
+          let rLabel = bt.querySelector(".receptivity-label");
+          if (!rLabel) {
+            rLabel = document.createElement("span");
+            rLabel.className = "receptivity-label";
+            rLabel.style.position = "absolute";
+            rLabel.style.left = "32px";
+            rLabel.style.top = "50%";
+            rLabel.style.transform = "translateY(-50%)";
+            rLabel.style.fontSize = "13px";
+            rLabel.style.color = "#1e293b";
+            rLabel.style.fontWeight = "bold";
+            rLabel.style.pointerEvents = "none";
+            rLabel.style.whiteSpace = "nowrap";
+            bt.appendChild(rLabel);
+          }
+          rLabel.textContent = step.transitions[bIdx].receptivity;
         }
       });
     } else {
@@ -1461,7 +1480,7 @@ function restoreDiagram(data) {
 
       connections.push(connObj);
 
-      if (toBox.classList.contains("or_divergence")) {
+      if (toBox.classList.contains("or_divergence") || toBox.classList.contains("and_divergence")) {
         fromBox.classList.add("connected-to-branch");
       }
 

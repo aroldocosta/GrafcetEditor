@@ -66,6 +66,42 @@
       <div class="connector bottom center"></div>
     </div>
 
+    <div class="palette-title">Divergência AND</div>
+    <div class="box and_divergence" draggable="true" data-type="and_divergence">
+      <div class="connector top center"></div>
+      <div class="branch-stem-top"></div>
+      <div class="branch-transition center" data-branch="0" title="Clique para editar receptividade"></div>
+      <div class="branch-bar double"></div>
+      <div class="branch-legs bottom">
+        <div class="branch-leg left">
+          <div class="branch-stem-bottom"></div>
+          <div class="connector bottom" data-branch="0"></div>
+        </div>
+        <div class="branch-leg right">
+          <div class="branch-stem-bottom"></div>
+          <div class="connector bottom" data-branch="1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="palette-title">Convergência AND</div>
+    <div class="box and_convergence" draggable="true" data-type="and_convergence">
+      <div class="branch-legs top">
+        <div class="branch-leg left">
+          <div class="connector top" data-branch="0"></div>
+          <div class="branch-stem-top"></div>
+        </div>
+        <div class="branch-leg right">
+          <div class="connector top" data-branch="1"></div>
+          <div class="branch-stem-top"></div>
+        </div>
+      </div>
+      <div class="branch-bar double"></div>
+      <div class="branch-transition center" data-branch="0" title="Clique para editar receptividade"></div>
+      <div class="branch-stem-bottom"></div>
+      <div class="connector bottom center"></div>
+    </div>
+
     <button class="palette-btn btn-compile" onclick="doCompile()">COMPILAR</button>
     <button class="palette-btn btn-export" onclick="exportDiagram()">EXPORTAR JSON</button>
     <button class="palette-btn btn-import" onclick="triggerImportDiagram()">IMPORTAR JSON</button>

@@ -178,16 +178,20 @@ body {
   display: none !important;
 }
 
-/* --- Estilos para Divergência e Convergência OR --- */
+/* --- Estilos para Divergência e Convergência OR e AND --- */
 .box.or_divergence,
-.box.or_convergence {
+.box.or_convergence,
+.box.and_divergence,
+.box.and_convergence {
   width: 360px;
   height: 60px;
   background: transparent;
 }
 
 #palette .box.or_divergence,
-#palette .box.or_convergence {
+#palette .box.or_convergence,
+#palette .box.and_divergence,
+#palette .box.and_convergence {
   width: 100px;
   height: 50px;
   margin-bottom: 8px;
@@ -205,6 +209,15 @@ body {
   z-index: 1;
 }
 
+/* Barra Dupla para AND */
+.branch-bar.double {
+  height: 8px;
+  background: transparent;
+  border-top: 3px solid #333;
+  border-bottom: 3px solid #333;
+  box-sizing: border-box;
+}
+
 #palette .branch-bar {
   left: 10px;
   right: 10px;
@@ -216,6 +229,14 @@ body {
 
 .or_convergence .branch-bar {
   bottom: 15px;
+}
+
+.and_divergence .branch-bar {
+  top: 26px;
+}
+
+.and_convergence .branch-bar {
+  bottom: 26px;
 }
 
 .branch-stem-top {
@@ -231,6 +252,12 @@ body {
   left: calc(50% - 1px);
 }
 
+.and_divergence .branch-stem-top {
+  top: 0;
+  height: 26px;
+  left: calc(50% - 1px);
+}
+
 .or_convergence .branch-legs.top .branch-stem-top {
   top: 0;
   height: 45px;
@@ -239,8 +266,20 @@ body {
   left: calc(50% - 1px);
 }
 
+.and_convergence .branch-legs.top .branch-stem-top {
+  top: 0;
+  height: 34px;
+  width: 2px;
+  background: #333;
+  left: calc(50% - 1px);
+}
+
 #palette .or_convergence .branch-legs.top .branch-stem-top {
   height: 35px;
+}
+
+#palette .and_convergence .branch-legs.top .branch-stem-top {
+  height: 25px;
 }
 
 .branch-stem-bottom {
@@ -258,9 +297,23 @@ body {
   left: calc(50% - 1px);
 }
 
+.and_divergence .branch-legs.bottom .branch-stem-bottom {
+  top: 0;
+  height: 34px;
+  width: 2px;
+  background: #333;
+  left: calc(50% - 1px);
+}
+
 .or_convergence .branch-stem-bottom {
   bottom: 0;
   height: 15px;
+  left: calc(50% - 1px);
+}
+
+.and_convergence .branch-stem-bottom {
+  bottom: 0;
+  height: 26px;
   left: calc(50% - 1px);
 }
 
@@ -270,14 +323,24 @@ body {
   left: 0;
 }
 
-.branch-legs.bottom {
+.or_divergence .branch-legs.bottom {
   top: 15px;
   height: 45px;
 }
 
-.branch-legs.top {
+.and_divergence .branch-legs.bottom {
+  top: 26px;
+  height: 34px;
+}
+
+.or_convergence .branch-legs.top {
   top: 0;
   height: 45px;
+}
+
+.and_convergence .branch-legs.top {
+  top: 0;
+  height: 34px;
 }
 
 .branch-leg {
@@ -315,6 +378,17 @@ body {
   transition: background-color 0.2s, transform 0.15s;
 }
 
+.and_divergence .branch-transition.center {
+  top: 10px;
+  left: calc(50% - 12.5px);
+}
+
+.and_convergence .branch-transition.center {
+  top: auto;
+  bottom: 10px;
+  left: calc(50% - 12.5px);
+}
+
 .branch-transition:hover {
   background: dodgerblue;
   transform: scale(1.15);
@@ -324,22 +398,26 @@ body {
   left: calc(50% - 3px) !important;
 }
 
-.or_divergence .connector.top {
+.or_divergence .connector.top,
+.and_divergence .connector.top {
   top: -3px;
   left: calc(50% - 3px);
 }
 
-.or_divergence .connector.bottom {
+.or_divergence .connector.bottom,
+.and_divergence .connector.bottom {
   bottom: -3px;
   left: calc(50% - 3px);
 }
 
-.or_convergence .connector.top {
+.or_convergence .connector.top,
+.and_convergence .connector.top {
   top: -3px;
   left: calc(50% - 3px);
 }
 
-.or_convergence .connector.bottom {
+.or_convergence .connector.bottom,
+.and_convergence .connector.bottom {
   bottom: -3px;
   left: calc(50% - 3px);
 }

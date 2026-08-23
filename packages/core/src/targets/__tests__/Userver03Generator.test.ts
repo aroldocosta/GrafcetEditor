@@ -331,6 +331,89 @@ comparats:
     ]);
   });
 
+  it('deve gerar equações booleanas corretas para Divergência AND (paralelismo)', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [] },
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 3, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 2 }] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2, 3], receptivity: 'I1' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM1=!M128',
+      'SM2=M1*I1',
+      'SM3=M1*I1',
+      'RM1=M1*I1',
+      'XQ1=M2',
+      'XQ2=M3',
+      'SM128=1;'
+    ]);
+  });
+
+  it('deve gerar equações booleanas corretas para Convergência AND (sincronização de ramos)', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: false, actions: [] },
+        { id: 2, isInitial: false, actions: [] },
+        { id: 3, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1, 2], toSteps: [3], receptivity: 'I2' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM3=M1*M2*I2',
+      'RM1=M1*M2*I2',
+      'RM2=M1*M2*I2',
+      'XQ1=M3',
+      'SM128=1;'
+    ]);
+  });
+
+  it('deve gerar equações booleanas corretas para um ciclo completo com Divergência AND e Convergência AND', () => {
+    const ir: GrafcetIR = {
+      steps: [
+        { id: 1, isInitial: true, actions: [] },
+        { id: 2, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 1 }] },
+        { id: 3, isInitial: false, actions: [{ qualifier: 'X', resourceType: 'Q', channel: 2 }] },
+        { id: 4, isInitial: false, actions: [] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2, 3], receptivity: 'I1' },
+        { id: 2, fromSteps: [2, 3], toSteps: [4], receptivity: 'I2' },
+        { id: 3, fromSteps: [4], toSteps: [1], receptivity: 'I3' }
+      ]
+    };
+
+    const output = generator.generate(ir);
+    const config = output.metadata?.config;
+
+    expect(config.lines).toEqual([
+      'SM1=!M128+M4*I3',
+      'SM2=M1*I1',
+      'SM3=M1*I1',
+      'SM4=M2*M3*I2',
+      'RM1=M1*I1',
+      'RM2=M2*M3*I2',
+      'RM3=M2*M3*I2',
+      'RM4=M4*I3',
+      'XQ1=M2',
+      'XQ2=M3',
+      'SM128=1;'
+    ]);
+  });
+
   it('deve lançar erro se alguma etapa ultrapassar o limite de 127 memórias', () => {
     const ir: GrafcetIR = {
       steps: [

@@ -134,6 +134,92 @@ function buildGrafcetIR(stepsList) {
             });
           }
         }
+        // Caso D: Step -> Divergência AND (Ativação Paralela)
+        else if (targetNode.type === 'and_divergence') {
+          const transKey = `${s.id}->and_div(${targetNode.id})`;
+          if (!processedTransitions.has(transKey)) {
+            processedTransitions.add(transKey);
+            const destVisualIds = [];
+            [0, 1].forEach(branchIdx => {
+              const destId = targetNode.branchOutputs ? targetNode.branchOutputs[String(branchIdx)] : undefined;
+              if (destId) {
+                const destNode = stepsMap.get(destId);
+                if (destNode && (destNode.type === 'start_step' || destNode.type === 'active_step')) {
+                  const destVisualId = idToVisualMap.get(destNode.id) || destNode.id;
+                  if (!destVisualIds.includes(destVisualId)) {
+                    destVisualIds.push(destVisualId);
+                  }
+                }
+              }
+            });
+            if (destVisualIds.length > 0) {
+              const receptivity = (targetNode.transitions && targetNode.transitions[0] && targetNode.transitions[0].receptivity)
+                ? targetNode.transitions[0].receptivity
+                : `1`;
+
+              transitions.push({
+                id: transitions.length + 1,
+                fromSteps: [visualFromId],
+                toSteps: destVisualIds,
+                receptivity: receptivity
+              });
+            }
+          }
+        }
+        // Caso E: Step -> Convergência AND (Sincronização de Ramos)
+        else if (targetNode.type === 'and_convergence') {
+          const transKey = `and_conv(${targetNode.id})`;
+          if (!processedTransitions.has(transKey)) {
+            processedTransitions.add(transKey);
+            const fromVisualIds = [];
+            if (targetNode.branchInputs) {
+              [0, 1].forEach(branchIdx => {
+                const srcId = targetNode.branchInputs[String(branchIdx)];
+                if (srcId) {
+                  const srcNode = stepsMap.get(srcId);
+                  if (srcNode && (srcNode.type === 'start_step' || srcNode.type === 'active_step')) {
+                    const srcVisualId = idToVisualMap.get(srcNode.id) || srcNode.id;
+                    if (!fromVisualIds.includes(srcVisualId)) {
+                      fromVisualIds.push(srcVisualId);
+                    }
+                  }
+                }
+              });
+            }
+            if (fromVisualIds.length === 0 && targetNode.inputs) {
+              targetNode.inputs.forEach(srcId => {
+                const srcNode = stepsMap.get(srcId);
+                if (srcNode && (srcNode.type === 'start_step' || srcNode.type === 'active_step')) {
+                  const srcVisualId = idToVisualMap.get(srcNode.id) || srcNode.id;
+                  if (!fromVisualIds.includes(srcVisualId)) {
+                    fromVisualIds.push(srcVisualId);
+                  }
+                }
+              });
+            }
+
+            if (targetNode.outputs && targetNode.outputs.length > 0) {
+              targetNode.outputs.forEach(finalDestId => {
+                const finalDestNode = stepsMap.get(finalDestId);
+                if (finalDestNode && (finalDestNode.type === 'start_step' || finalDestNode.type === 'active_step')) {
+                  const finalDestVisualId = idToVisualMap.get(finalDestNode.id) || finalDestNode.id;
+                  const receptivity = (targetNode.transitions && targetNode.transitions[0] && targetNode.transitions[0].receptivity)
+                    ? targetNode.transitions[0].receptivity
+                    : `1`;
+
+                  if (fromVisualIds.length > 0) {
+                    transitions.push({
+                      id: transitions.length + 1,
+                      fromSteps: fromVisualIds,
+                      toSteps: [finalDestVisualId],
+                      receptivity: receptivity
+                    });
+                  }
+                }
+              });
+            }
+          }
+        }
       });
     }
   });
