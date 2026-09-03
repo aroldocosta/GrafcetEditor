@@ -3,6 +3,7 @@ export * from './generator/ICodeGenerator.js';
 export * from './generator/CodeGeneratorRegistry.js';
 export * from './targets/Userver03Generator.js';
 export * from './validator/ReceptivityValidator.js';
+export * from './validator/GrafcetStructureValidator.js';
 
 import { CodeGeneratorRegistry } from './generator/CodeGeneratorRegistry.js';
 import { Userver03Generator } from './targets/Userver03Generator.js';

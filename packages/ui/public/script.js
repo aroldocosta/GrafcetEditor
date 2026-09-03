@@ -194,6 +194,58 @@ function getConnectorElement(box, connectorType, branch) {
   return box.querySelector(`.connector.${connectorType}`);
 }
 
+/**
+ * Identifica se uma etapa pertence a algum ramal de uma Divergência em "E" ativa.
+ * Retorna o ID da divergência e o índice do ramal (0, 1...), ou null se for etapa comum.
+ */
+function findParallelBranch(stepNodeId) {
+  const andDivergences = stepsList.filter(s => s.type === "and_divergence");
+  for (const div of andDivergences) {
+    if (!div.branchOutputs) continue;
+    for (const [branchIdx, rootStepId] of Object.entries(div.branchOutputs)) {
+      if (!rootStepId) continue;
+      const visited = new Set();
+      const queue = [rootStepId];
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        if (visited.has(curr)) continue;
+        visited.add(curr);
+        if (curr === stepNodeId) {
+          return { divId: div.id, branch: String(branchIdx) };
+        }
+        const currNode = stepsList.find(s => s.id === curr);
+        if (currNode && currNode.outputs) {
+          for (const nextId of currNode.outputs) {
+            const nextNode = stepsList.find(s => s.id === nextId);
+            if (nextNode && nextNode.type !== "and_convergence" && !visited.has(nextId)) {
+              queue.push(nextId);
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Verifica se um conector específico (por caixa, tipo 'top'/'bottom' e branch) já está ocupado por alguma conexão.
+ */
+function isSpecificConnectorOccupied(targetBox, connectorType, branchVal) {
+  const normBranch = (branchVal !== null && branchVal !== undefined && branchVal !== "") ? String(branchVal) : null;
+  return connections.some(c => {
+    if (c.from?.box === targetBox && c.from?.connector === connectorType) {
+      const cFromBranch = (c.from?.branch !== null && c.from?.branch !== undefined && c.from?.branch !== "") ? String(c.from?.branch) : null;
+      if (normBranch === null || cFromBranch === normBranch) return true;
+    }
+    if (c.to?.box === targetBox && c.to?.connector === connectorType) {
+      const cToBranch = (c.to?.branch !== null && c.to?.branch !== undefined && c.to?.branch !== "") ? String(c.to?.branch) : null;
+      if (normBranch === null || cToBranch === normBranch) return true;
+    }
+    return false;
+  });
+}
+
 function attachConnectorListeners(box) {
   box.querySelectorAll(".connector").forEach(connector => {
     connector.addEventListener("click", e => {
@@ -206,6 +258,18 @@ function attachConnectorListeners(box) {
       const connBranch = connector.getAttribute("data-branch");
 
       if (!currentConnection) {
+        // Validação IEC 60848: conectores de ramal e topo/base de divergência/convergência aceitam apenas 1 conexão
+        const isRestrictedConnector = connector.hasAttribute("data-branch") || 
+          (box.classList.contains("and_divergence") && connector.classList.contains("top")) ||
+          (box.classList.contains("or_divergence") && connector.classList.contains("top")) ||
+          (box.classList.contains("and_convergence") && connector.classList.contains("bottom")) ||
+          (box.classList.contains("or_convergence") && connector.classList.contains("bottom"));
+
+        if (isRestrictedConnector && isSpecificConnectorOccupied(box, connector.classList.contains("top") ? "top" : "bottom", connBranch)) {
+          alert("Este conector já possui uma conexão ligada a ele. Pela norma IEC 60848, é permitida apenas 1 linha por conector de ramal.");
+          return;
+        }
+
         const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         polyline.setAttribute("stroke", "lightblue");
         polyline.setAttribute("stroke-width", "2");
@@ -260,6 +324,90 @@ function attachConnectorListeners(box) {
       } else {
         if (currentConnection.mouseMoveHandler) {
           document.removeEventListener("mousemove", currentConnection.mouseMoveHandler);
+        }
+
+        const toConnectorType = connector.classList.contains("top") ? "top" : "bottom";
+        const fromConnectorType = currentConnection.from.connector;
+        const fromBox = currentConnection.from.box;
+        const toBox = box;
+
+        // Impedir auto-conexão no mesmo conector do mesmo bloco
+        if (fromBox === toBox && fromConnectorType === toConnectorType && currentConnection.from.branch === connBranch) {
+          svg.removeChild(currentConnection.polyline);
+          currentConnection = null;
+          return;
+        }
+
+        // Validação IEC 60848: Aridade 1:1 para conectores de ramal e topo/base de divergência/convergência
+        const isDestRestricted = connector.hasAttribute("data-branch") || 
+          (toBox.classList.contains("and_divergence") && toConnectorType === "top") ||
+          (toBox.classList.contains("or_divergence") && toConnectorType === "top") ||
+          (toBox.classList.contains("and_convergence") && toConnectorType === "bottom") ||
+          (toBox.classList.contains("or_convergence") && toConnectorType === "bottom");
+
+        if (isDestRestricted && isSpecificConnectorOccupied(toBox, toConnectorType, connBranch)) {
+          svg.removeChild(currentConnection.polyline);
+          currentConnection = null;
+          alert("Este conector de destino já possui uma conexão conectada (aridade 1:1 segundo a norma IEC 60848).");
+          return;
+        }
+
+        const fromId = parseInt(fromBox.getAttribute("data-id"));
+        const toId = parseInt(toBox.getAttribute("data-id"));
+
+        // Validação de Divergência em "E": Impedir que a mesma etapa seja alimentada por múltiplos ramais da mesma divergência
+        if (fromBox.classList.contains("and_divergence") && fromConnectorType === "bottom") {
+          const alreadyFedByThisDiv = connections.some(c => 
+            (c.from?.box === fromBox && c.to?.box === toBox) ||
+            (c.to?.box === fromBox && c.from?.box === toBox)
+          );
+          if (alreadyFedByThisDiv) {
+            svg.removeChild(currentConnection.polyline);
+            currentConnection = null;
+            alert("Conexão inválida (IEC 60848): A mesma etapa não pode ser ativada por múltiplos ramais da mesma divergência em 'E'.");
+            return;
+          }
+        }
+
+        // Validação de Convergência em "E": Impedir cruzamento de ramal e conexões duplicadas da mesma etapa
+        if (toBox.classList.contains("and_convergence") && toConnectorType === "top") {
+          const alreadyConnectedToThisConv = connections.some(c => 
+            (c.from?.box === fromBox && c.to?.box === toBox) ||
+            (c.to?.box === fromBox && c.from?.box === toBox)
+          );
+          if (alreadyConnectedToThisConv) {
+            svg.removeChild(currentConnection.polyline);
+            currentConnection = null;
+            alert("Conexão inválida (IEC 60848): A mesma etapa não pode ser conectada mais de uma vez na mesma barra de convergência.");
+            return;
+          }
+
+          const branchFrom = findParallelBranch(fromId);
+          if (branchFrom && branchFrom.branch !== null) {
+            const destBranch = (connBranch !== null && connBranch !== undefined && connBranch !== "") ? String(connBranch) : "0";
+            if (String(branchFrom.branch) !== destBranch) {
+              svg.removeChild(currentConnection.polyline);
+              currentConnection = null;
+              alert(`Conexão inválida (IEC 60848 item 3.1): Cruzamento proibido! A Etapa pertence ao Ramal ${parseInt(branchFrom.branch) + 1} e deve ser conectada ao pino do Ramal ${parseInt(branchFrom.branch) + 1} da Convergência em "E", e não ao Ramal ${parseInt(destBranch) + 1}.`);
+              return;
+            }
+          }
+        }
+
+        // Validação IEC 60848 item 3.1: Proibir cruzamentos parciais entre ramais paralelos independentes
+        if (!isNaN(fromId) && !isNaN(toId)) {
+          const fromNode = stepsList.find(s => s.id === fromId);
+          const toNode = stepsList.find(s => s.id === toId);
+          if (fromNode && toNode && toNode.type !== "and_convergence") {
+            const branchFrom = findParallelBranch(fromId);
+            const branchTo = findParallelBranch(toId);
+            if (branchFrom && branchTo && branchFrom.divId === branchTo.divId && branchFrom.branch !== branchTo.branch) {
+              svg.removeChild(currentConnection.polyline);
+              currentConnection = null;
+              alert(`Conexão inválida (IEC 60848 item 3.1): Cruzamento parcial proibido! Não é permitido saltar do Ramal ${parseInt(branchFrom.branch) + 1} para o Ramal ${parseInt(branchTo.branch) + 1} antes de fechar a estrutura na Convergência em "E".`);
+              return;
+            }
+          }
         }
 
         const fromConn = getConnectorElement(currentConnection.from.box, currentConnection.from.connector, currentConnection.from.branch);

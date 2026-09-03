@@ -9,6 +9,20 @@ function buildGrafcetIR(stepsList) {
   const processedTransitions = new Set();
   const stepsMap = new Map(stepsList.map(s => [s.id, s]));
 
+  // Validação Estrutural IEC 60848: Cada Divergência em "E" deve ter no máximo 1 etapa conectada na entrada
+  const andDivergences = stepsList.filter(s => s.type === 'and_divergence');
+  for (const andDiv of andDivergences) {
+    const incomingRealSteps = (andDiv.inputs || []).filter(inId => {
+      const node = stepsMap.get(inId);
+      return node && (node.type === 'start_step' || node.type === 'active_step');
+    });
+    if (incomingRealSteps.length > 1) {
+      const msg = `Erro Estrutural GRAFCET (IEC 60848): A Divergência em "E" possui ${incomingRealSteps.length} etapas de entrada conectadas. Pela norma, é permitida apenas 1 etapa/transição comum antes da barra dupla.`;
+      alert(msg);
+      throw new Error(msg);
+    }
+  }
+
   // 1. Filtrar e mapear apenas etapas reais (Start e Active)
   const realSteps = stepsList.filter(s => s.type === 'start_step' || s.type === 'active_step');
 
@@ -247,7 +261,88 @@ function normalizeReceptivity(receptivity) {
     .replace(/~/g, '!');
 }
 
+function validateGrafcetStructure(ir) {
+  const transitionsFromStep = new Map();
+  for (const s of ir.steps) {
+    transitionsFromStep.set(s.id, []);
+  }
+  for (const t of ir.transitions) {
+    for (const fromId of t.fromSteps) {
+      if (transitionsFromStep.has(fromId)) transitionsFromStep.get(fromId).push(t);
+    }
+  }
+
+  const divergences = ir.transitions.filter(t => t.toSteps.length > 1);
+  for (const div of divergences) {
+    const branchSteps = new Map();
+    for (let branchIdx = 0; branchIdx < div.toSteps.length; branchIdx++) {
+      const rootStepId = div.toSteps[branchIdx];
+      const visited = new Set();
+      const queue = [rootStepId];
+
+      while (queue.length > 0) {
+        const currId = queue.shift();
+        if (visited.has(currId)) continue;
+        visited.add(currId);
+
+        const outgoing = transitionsFromStep.get(currId) || [];
+        for (const outT of outgoing) {
+          if (outT.fromSteps.length === 1) {
+            for (const nextStepId of outT.toSteps) {
+              if (!visited.has(nextStepId)) queue.push(nextStepId);
+            }
+          }
+        }
+      }
+      branchSteps.set(branchIdx, visited);
+    }
+
+    // Verificar cruzamentos parciais entre ramais
+    for (let i = 0; i < div.toSteps.length; i++) {
+      for (let j = i + 1; j < div.toSteps.length; j++) {
+        const stepsI = branchSteps.get(i);
+        const stepsJ = branchSteps.get(j);
+
+        for (const sId of stepsI) {
+          if (stepsJ.has(sId)) {
+            const err = `Erro Estrutural GRAFCET (IEC 60848 item 3.1): Cruzamento parcial detectado! A Etapa ${sId} pertence simultaneamente aos ramais ${i + 1} e ${j + 1}.`;
+            alert(err);
+            throw new Error(err);
+          }
+          const outgoing = transitionsFromStep.get(sId) || [];
+          for (const t of outgoing) {
+            if (t.fromSteps.length === 1) {
+              for (const targetId of t.toSteps) {
+                if (stepsJ.has(targetId) && !stepsI.has(targetId)) {
+                  const err = `Erro Estrutural GRAFCET (IEC 60848 item 3.1): Cruzamento parcial proibido! Transição salta da Etapa ${sId} (Ramal ${i + 1}) diretamente para a Etapa ${targetId} (Ramal ${j + 1}) no meio do paralelismo.`;
+                  alert(err);
+                  throw new Error(err);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Alerta de receptividades homônimas em divergência e convergência associadas
+    const candidateConvergences = ir.transitions.filter(t => t.fromSteps.length > 1);
+    for (const conv of candidateConvergences) {
+      if (div.receptivity && conv.receptivity) {
+        const normDiv = div.receptivity.trim().toUpperCase();
+        const normConv = conv.receptivity.trim().toUpperCase();
+        if (normDiv === normConv && normDiv !== '1' && normDiv !== 'TRUE') {
+          console.warn(`[Aviso GRAFCET]: A transição de abertura (Divergência ${div.id}) e a transição de fechamento (Convergência ${conv.id}) compartilham a mesma receptividade "${div.receptivity}". Isso pode causar disparo prematuro da convergência por corrida de sinal.`);
+        }
+      }
+    }
+  }
+}
+
 function generateUserver03(ir) {
+  // Validar estrutura topológica e regras de segurança IEC 60848
+  validateGrafcetStructure(ir);
+
   const lines = [];
 
   // 0. Validar limite de 127 memórias
