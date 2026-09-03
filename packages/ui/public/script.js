@@ -547,8 +547,9 @@ function addStepConnection(fromBox, toBox, fromBranch, toBranch) {
     toStep.branchInputs[b] = fromStep.id;
   }
 
-  // Ocultar transição do step apenas se conectado à divergência OR
-  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && toStep.type === "or_divergence") {
+  // Ocultar transição do step se conectado à divergência OR ou convergência AND
+  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && 
+      (toStep.type === "or_divergence" || toStep.type === "and_convergence")) {
     fromBox.classList.add("connected-to-branch");
   }
 }
@@ -581,12 +582,15 @@ function removeStepConnection(connection) {
     }
   }
 
-  // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência OR
+  // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência OR nem convergência AND
   if (fromStep.type === "start_step" || fromStep.type === "active_step") {
-    const stillConnectedToDiv = connections.some(c =>
-      c !== connection && c.from?.box === fromBox && c.to?.box?.classList.contains("or_divergence")
+    const stillConnectedToBranch = connections.some(c =>
+      c !== connection && c.from?.box === fromBox && (
+        c.to?.box?.classList.contains("or_divergence") ||
+        c.to?.box?.classList.contains("and_convergence")
+      )
     );
-    if (!stillConnectedToDiv) {
+    if (!stillConnectedToBranch) {
       fromBox.classList.remove("connected-to-branch");
     }
   }
@@ -1477,7 +1481,7 @@ function restoreDiagram(data) {
 
       connections.push(connObj);
 
-      if (toBox.classList.contains("or_divergence")) {
+      if (toBox.classList.contains("or_divergence") || toBox.classList.contains("and_convergence")) {
         fromBox.classList.add("connected-to-branch");
       }
 
