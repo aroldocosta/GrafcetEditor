@@ -99,11 +99,11 @@ function handleCanvasDrop(e) {
       new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 1' }),
       new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Ramo 2' })
     ];
-  } else if (type === "and_divergence" || type === "and_convergence") {
+  } else if (type === "and_convergence") {
     step.transitions = [
-      new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Transição Comum' })
+      new Transition({ id: ++transitionCounter, receptivity: '1', description: 'Transição de Sincronização' })
     ];
-  } else if (type === "or_convergence") {
+  } else if (type === "or_convergence" || type === "and_divergence") {
     step.transitions = [];
   } else {
     createTransitionForStep(step);
@@ -302,7 +302,7 @@ function attachHoverListeners(box) {
   const isAndDiv = box.classList.contains("and_divergence");
   const isAndConv = box.classList.contains("and_convergence");
 
-  if (isOrDiv || isAndDiv || isAndConv) {
+  if (isOrDiv || isAndConv) {
     const branchTransitions = box.querySelectorAll(".branch-transition");
     branchTransitions.forEach(bt => {
       const branchIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
@@ -336,7 +336,7 @@ function attachHoverListeners(box) {
     return;
   }
 
-  if (isOrConv) {
+  if (isOrConv || isAndDiv) {
     return;
   }
 
@@ -440,9 +440,6 @@ function renumberBoxes() {
   const boxes = [...canvas.querySelectorAll(".box:not(.or_divergence):not(.or_convergence):not(.and_divergence):not(.and_convergence)")];
   boxes.forEach((box, index) => {
     const inner = box.querySelector(".inner-rect");
-    if (inner) inner.textContent = index + 1;
-  });
-}
     if (inner) inner.textContent = index + 1;
   });
 }
@@ -550,8 +547,8 @@ function addStepConnection(fromBox, toBox, fromBranch, toBranch) {
     toStep.branchInputs[b] = fromStep.id;
   }
 
-  // Ocultar transição do step se conectado à divergência OR ou AND
-  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && (toStep.type === "or_divergence" || toStep.type === "and_divergence")) {
+  // Ocultar transição do step apenas se conectado à divergência OR
+  if ((fromStep.type === "start_step" || fromStep.type === "active_step") && toStep.type === "or_divergence") {
     fromBox.classList.add("connected-to-branch");
   }
 }
@@ -584,10 +581,10 @@ function removeStepConnection(connection) {
     }
   }
 
-  // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência
+  // Restaurar visual da transição se o step não estiver mais conectado a nenhuma divergência OR
   if (fromStep.type === "start_step" || fromStep.type === "active_step") {
     const stillConnectedToDiv = connections.some(c =>
-      c !== connection && c.from?.box === fromBox && (c.to?.box?.classList.contains("or_divergence") || c.to?.box?.classList.contains("and_divergence"))
+      c !== connection && c.from?.box === fromBox && c.to?.box?.classList.contains("or_divergence")
     );
     if (!stillConnectedToDiv) {
       fromBox.classList.remove("connected-to-branch");
@@ -1390,7 +1387,7 @@ function restoreDiagram(data) {
     }
 
     // Atualizar label da receptividade se houver
-    if (sData.type === "or_divergence" || sData.type === "and_divergence" || sData.type === "and_convergence") {
+    if (sData.type === "or_divergence" || sData.type === "and_convergence") {
       const branchTransitions = clone.querySelectorAll(".branch-transition");
       branchTransitions.forEach(bt => {
         const bIdx = parseInt(bt.getAttribute("data-branch") || "0", 10);
@@ -1480,7 +1477,7 @@ function restoreDiagram(data) {
 
       connections.push(connObj);
 
-      if (toBox.classList.contains("or_divergence") || toBox.classList.contains("and_divergence")) {
+      if (toBox.classList.contains("or_divergence")) {
         fromBox.classList.add("connected-to-branch");
       }
 

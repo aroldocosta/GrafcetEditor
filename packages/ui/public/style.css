@@ -223,16 +223,13 @@ body {
   right: 10px;
 }
 
-.or_divergence .branch-bar {
+.or_divergence .branch-bar,
+.and_divergence .branch-bar {
   top: 15px;
 }
 
 .or_convergence .branch-bar {
   bottom: 15px;
-}
-
-.and_divergence .branch-bar {
-  top: 26px;
 }
 
 .and_convergence .branch-bar {
@@ -246,15 +243,10 @@ body {
   z-index: 1;
 }
 
-.or_divergence .branch-stem-top {
-  top: 0;
-  height: 15px;
-  left: calc(50% - 1px);
-}
-
+.or_divergence .branch-stem-top,
 .and_divergence .branch-stem-top {
   top: 0;
-  height: 26px;
+  height: 15px;
   left: calc(50% - 1px);
 }
 
@@ -289,17 +281,10 @@ body {
   z-index: 1;
 }
 
-.or_divergence .branch-legs.bottom .branch-stem-bottom {
-  top: 0;
-  height: 45px;
-  width: 2px;
-  background: #333;
-  left: calc(50% - 1px);
-}
-
+.or_divergence .branch-legs.bottom .branch-stem-bottom,
 .and_divergence .branch-legs.bottom .branch-stem-bottom {
   top: 0;
-  height: 34px;
+  height: 45px;
   width: 2px;
   background: #333;
   left: calc(50% - 1px);
@@ -323,14 +308,10 @@ body {
   left: 0;
 }
 
-.or_divergence .branch-legs.bottom {
+.or_divergence .branch-legs.bottom,
+.and_divergence .branch-legs.bottom {
   top: 15px;
   height: 45px;
-}
-
-.and_divergence .branch-legs.bottom {
-  top: 26px;
-  height: 34px;
 }
 
 .or_convergence .branch-legs.top {
@@ -376,11 +357,6 @@ body {
   cursor: pointer;
   border: 1px solid #222;
   transition: background-color 0.2s, transform 0.15s;
-}
-
-.and_divergence .branch-transition.center {
-  top: 10px;
-  left: calc(50% - 12.5px);
 }
 
 .and_convergence .branch-transition.center {

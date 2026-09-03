@@ -153,9 +153,9 @@ function buildGrafcetIR(stepsList) {
               }
             });
             if (destVisualIds.length > 0) {
-              const receptivity = (targetNode.transitions && targetNode.transitions[0] && targetNode.transitions[0].receptivity)
-                ? targetNode.transitions[0].receptivity
-                : `1`;
+              const receptivity = (s.transitions && s.transitions[0] && s.transitions[0].receptivity)
+                ? s.transitions[0].receptivity
+                : `I${visualFromId}`;
 
               transitions.push({
                 id: transitions.length + 1,
