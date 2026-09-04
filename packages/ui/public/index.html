@@ -9,124 +9,161 @@
 </head>
 
 <body>
-  <div id="palette">
-    <div class="palette-title">Start</div>
-    <div class="box start_step" draggable="true" data-state="inactive">
-      <div class="line-top start"></div>
-      <div class="inner-rect"></div>
-      <div class="line-bottom start"></div>
-      <div class="transition start"></div>
-      <div class="connector top start"></div>
-      <div class="connector bottom start"></div>
-    </div>
-
-    <div class="palette-title">Active</div>
-    <div class="box active_step" draggable="true" data-state="inactive">
-      <div class="line-top active"></div>
-      <div class="inner-rect"></div>
-      <div class="line-bottom active"></div>
-      <div class="transition active"></div>
-      <div class="connector top active"></div>
-      <div class="connector bottom active"></div>
-    </div>
-
-    <div class="palette-title">Divergência OR</div>
-    <div class="box or_divergence" draggable="true" data-type="or_divergence">
-      <div class="connector top center"></div>
-      <div class="branch-stem-top"></div>
-      <div class="branch-bar"></div>
-      <div class="branch-legs bottom">
-        <div class="branch-leg left">
-          <div class="branch-stem-bottom"></div>
-          <div class="branch-transition" data-branch="0" title="Clique para editar receptividade"></div>
-          <div class="connector bottom" data-branch="0"></div>
-        </div>
-        <div class="branch-leg right">
-          <div class="branch-stem-bottom"></div>
-          <div class="branch-transition" data-branch="1" title="Clique para editar receptividade"></div>
-          <div class="connector bottom" data-branch="1"></div>
-        </div>
+  <header id="top-bar">
+    <div class="top-bar-left">
+      <div class="app-brand">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-title">GRAFCET Editor</span>
       </div>
     </div>
 
-    <div class="palette-title">Convergência OR</div>
-    <div class="box or_convergence" draggable="true" data-type="or_convergence">
-      <div class="branch-legs top">
-        <div class="branch-leg left">
-          <div class="connector top" data-branch="0"></div>
-          <div class="branch-stem-top"></div>
-        </div>
-        <div class="branch-leg right">
-          <div class="connector top" data-branch="1"></div>
-          <div class="branch-stem-top"></div>
-        </div>
+    <div class="top-bar-right">
+      <div class="toolbar-group">
+        <button class="top-btn btn-import" onclick="triggerImportDiagram()" title="Importar Diagrama JSON">
+          <span class="btn-icon">📁</span>
+          <span>IMPORTAR JSON</span>
+        </button>
+        <button class="top-btn btn-export" onclick="exportDiagram()" title="Exportar Diagrama JSON">
+          <span class="btn-icon">💾</span>
+          <span>EXPORTAR JSON</span>
+        </button>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
       </div>
-      <div class="branch-bar"></div>
-      <div class="branch-stem-bottom"></div>
-      <div class="connector bottom center"></div>
-    </div>
 
-    <div class="palette-title">Divergência AND</div>
-    <div class="box and_divergence" draggable="true" data-type="and_divergence">
-      <div class="connector top center"></div>
-      <div class="branch-stem-top"></div>
-      <div class="branch-bar double"></div>
-      <div class="branch-legs bottom">
-        <div class="branch-leg left">
-          <div class="branch-stem-bottom"></div>
-          <div class="connector bottom" data-branch="0"></div>
-        </div>
-        <div class="branch-leg right">
-          <div class="branch-stem-bottom"></div>
-          <div class="connector bottom" data-branch="1"></div>
-        </div>
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <button class="top-btn btn-clear" onclick="clearDiagram()" title="Limpar todo o diagrama">
+          <span class="btn-icon">🗑️</span>
+          <span>LIMPAR DIAGRAMA</span>
+        </button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <button class="top-btn btn-compile" onclick="doCompile()" title="Compilar GRAFCET e gerar lógica booleana">
+          <span class="btn-icon">⚙️</span>
+          <span>COMPILAR</span>
+        </button>
       </div>
     </div>
+  </header>
 
-    <div class="palette-title">Convergência AND</div>
-    <div class="box and_convergence" draggable="true" data-type="and_convergence">
-      <div class="branch-legs top">
-        <div class="branch-leg left">
-          <div class="connector top" data-branch="0"></div>
-          <div class="branch-stem-top"></div>
-        </div>
-        <div class="branch-leg right">
-          <div class="connector top" data-branch="1"></div>
-          <div class="branch-stem-top"></div>
+  <div id="app-workspace">
+    <div id="palette">
+      <div class="palette-title">Start</div>
+      <div class="box start_step" draggable="true" data-state="inactive">
+        <div class="line-top start"></div>
+        <div class="inner-rect"></div>
+        <div class="line-bottom start"></div>
+        <div class="transition start"></div>
+        <div class="connector top start"></div>
+        <div class="connector bottom start"></div>
+      </div>
+
+      <div class="palette-title">Active</div>
+      <div class="box active_step" draggable="true" data-state="inactive">
+        <div class="line-top active"></div>
+        <div class="inner-rect"></div>
+        <div class="line-bottom active"></div>
+        <div class="transition active"></div>
+        <div class="connector top active"></div>
+        <div class="connector bottom active"></div>
+      </div>
+
+      <div class="palette-title">Divergência OR</div>
+      <div class="box or_divergence" draggable="true" data-type="or_divergence">
+        <div class="connector top center"></div>
+        <div class="branch-stem-top"></div>
+        <div class="branch-bar"></div>
+        <div class="branch-legs bottom">
+          <div class="branch-leg left">
+            <div class="branch-stem-bottom"></div>
+            <div class="branch-transition" data-branch="0" title="Clique para editar receptividade"></div>
+            <div class="connector bottom" data-branch="0"></div>
+          </div>
+          <div class="branch-leg right">
+            <div class="branch-stem-bottom"></div>
+            <div class="branch-transition" data-branch="1" title="Clique para editar receptividade"></div>
+            <div class="connector bottom" data-branch="1"></div>
+          </div>
         </div>
       </div>
-      <div class="branch-bar double"></div>
-      <div class="branch-transition center" data-branch="0" title="Clique para editar receptividade"></div>
-      <div class="branch-stem-bottom"></div>
-      <div class="connector bottom center"></div>
-    </div>
 
-    <button class="palette-btn btn-compile" onclick="doCompile()">COMPILAR</button>
-    <button class="palette-btn btn-export" onclick="exportDiagram()">EXPORTAR JSON</button>
-    <button class="palette-btn btn-import" onclick="triggerImportDiagram()">IMPORTAR JSON</button>
-    <button class="palette-btn btn-clear" onclick="clearDiagram()">LIMPAR DIAGRAMA</button>
-    <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
-  </div>
-
-  <div id="canvas-viewport">
-    <div id="canvas">
-      <div class="quadrant-divider vertical"></div>
-      <div class="quadrant-divider horizontal"></div>
-      <span class="sheet-label sheet-1">Folha 1</span>
-      <span class="sheet-label sheet-2">Folha 2</span>
-      <span class="sheet-label sheet-3">Folha 3</span>
-      <span class="sheet-label sheet-4">Folha 4</span>
-    </div>
-
-    <!-- Controles de Navegação Flutuantes -->
-    <div id="nav-controls">
-      <button class="nav-btn" id="nav-up" title="Mover para Cima">▲</button>
-      <div class="nav-row">
-        <button class="nav-btn" id="nav-left" title="Mover para Esquerda">◄</button>
-        <button class="nav-btn" id="nav-center" title="Centralizar Visão">🎯</button>
-        <button class="nav-btn" id="nav-right" title="Mover para Direita">►</button>
+      <div class="palette-title">Convergência OR</div>
+      <div class="box or_convergence" draggable="true" data-type="or_convergence">
+        <div class="branch-legs top">
+          <div class="branch-leg left">
+            <div class="connector top" data-branch="0"></div>
+            <div class="branch-stem-top"></div>
+          </div>
+          <div class="branch-leg right">
+            <div class="connector top" data-branch="1"></div>
+            <div class="branch-stem-top"></div>
+          </div>
+        </div>
+        <div class="branch-bar"></div>
+        <div class="branch-stem-bottom"></div>
+        <div class="connector bottom center"></div>
       </div>
-      <button class="nav-btn" id="nav-down" title="Mover para Baixo">▼</button>
+
+      <div class="palette-title">Divergência AND</div>
+      <div class="box and_divergence" draggable="true" data-type="and_divergence">
+        <div class="connector top center"></div>
+        <div class="branch-stem-top"></div>
+        <div class="branch-bar double"></div>
+        <div class="branch-legs bottom">
+          <div class="branch-leg left">
+            <div class="branch-stem-bottom"></div>
+            <div class="connector bottom" data-branch="0"></div>
+          </div>
+          <div class="branch-leg right">
+            <div class="branch-stem-bottom"></div>
+            <div class="connector bottom" data-branch="1"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-title">Convergência AND</div>
+      <div class="box and_convergence" draggable="true" data-type="and_convergence">
+        <div class="branch-legs top">
+          <div class="branch-leg left">
+            <div class="connector top" data-branch="0"></div>
+            <div class="branch-stem-top"></div>
+          </div>
+          <div class="branch-leg right">
+            <div class="connector top" data-branch="1"></div>
+            <div class="branch-stem-top"></div>
+          </div>
+        </div>
+        <div class="branch-bar double"></div>
+        <div class="branch-transition center" data-branch="0" title="Clique para editar receptividade"></div>
+        <div class="branch-stem-bottom"></div>
+        <div class="connector bottom center"></div>
+      </div>
+    </div>
+
+    <div id="canvas-viewport">
+      <div id="canvas">
+        <div class="quadrant-divider vertical"></div>
+        <div class="quadrant-divider horizontal"></div>
+        <span class="sheet-label sheet-1">Folha 1</span>
+        <span class="sheet-label sheet-2">Folha 2</span>
+        <span class="sheet-label sheet-3">Folha 3</span>
+        <span class="sheet-label sheet-4">Folha 4</span>
+      </div>
+
+      <!-- Controles de Navegação Flutuantes -->
+      <div id="nav-controls">
+        <button class="nav-btn" id="nav-up" title="Mover para Cima">▲</button>
+        <div class="nav-row">
+          <button class="nav-btn" id="nav-left" title="Mover para Esquerda">◄</button>
+          <button class="nav-btn" id="nav-center" title="Centralizar Visão">🎯</button>
+          <button class="nav-btn" id="nav-right" title="Mover para Direita">►</button>
+        </div>
+        <button class="nav-btn" id="nav-down" title="Mover para Baixo">▼</button>
+      </div>
     </div>
   </div>
 
