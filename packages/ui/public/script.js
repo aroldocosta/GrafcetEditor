@@ -1653,30 +1653,143 @@ function loadDiagramFromStorage() {
   }
 }
 
+/* ==========================================================================
+   Gerenciamento de Arquivo de Projeto (Estilo Desktop + Fallback Web)
+   ========================================================================== */
+
+let currentFileHandle = null;
+let currentFileName = null;
+let toastTimeout = null;
+
+function showToast(message, duration = 2800) {
+  const toast = document.getElementById("toast-notification");
+  if (!toast) return;
+  toast.innerHTML = `<span style="font-size:15px">✔</span> ${message}`;
+  toast.classList.add("show");
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove("show");
+  }, duration);
+}
+
+function updateProjectNameUI(name) {
+  const label = document.getElementById("current-project-label");
+  if (label) {
+    label.textContent = name || "Sem título";
+  }
+  document.title = name ? `${name} - GRAFCET Editor` : "Drag & Drop GRAFCET";
+}
+
+function newDiagram() {
+  if (stepsList.length > 0) {
+    if (!confirm("Deseja iniciar um novo diagrama? As alterações não salvas serão perdidas.")) {
+      return;
+    }
+  }
+  clearCanvasDOM();
+  boxCounter = 0;
+  transitionCounter = 0;
+  localStorage.removeItem(STORAGE_KEY);
+  currentFileHandle = null;
+  currentFileName = null;
+  updateProjectNameUI("Sem título");
+  showToast("Novo diagrama iniciado.");
+  console.log("Novo diagrama em branco iniciado.");
+}
+
 function clearDiagram() {
-  if (confirm("Tem certeza que deseja limpar todo o diagrama? Essa ação não pode ser desfeita.")) {
-    clearCanvasDOM();
-    boxCounter = 0;
-    transitionCounter = 0;
-    localStorage.removeItem(STORAGE_KEY);
-    console.log("Diagrama limpo com sucesso.");
+  newDiagram();
+}
+
+async function openProject() {
+  if ("showOpenFilePicker" in window) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: "Diagrama GRAFCET JSON (*.json)",
+          accept: { "application/json": [".json"] }
+        }],
+        multiple: false
+      });
+      const file = await handle.getFile();
+      const content = await file.text();
+      const data = JSON.parse(content);
+      if (restoreDiagram(data)) {
+        currentFileHandle = handle;
+        currentFileName = file.name;
+        saveDiagramToStorage();
+        updateProjectNameUI(currentFileName);
+        showToast(`Arquivo "${currentFileName}" aberto com sucesso!`);
+      } else {
+        alert("Arquivo JSON de diagrama inválido.");
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("Erro no showOpenFilePicker, tentando fallback:", err);
+        triggerImportDiagram();
+      }
+    }
+  } else {
+    // Fallback transparente para navegadores sem File System Access API
+    triggerImportDiagram();
+  }
+}
+
+async function saveProject() {
+  saveDiagramToStorage();
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw || stepsList.length === 0) {
+    showToast("Nenhum elemento no diagrama para salvar.", 2000);
+    return;
+  }
+
+  if ("showSaveFilePicker" in window) {
+    try {
+      if (!currentFileHandle) {
+        currentFileHandle = await window.showSaveFilePicker({
+          suggestedName: currentFileName || "meu_grafcet.json",
+          types: [{
+            description: "Diagrama GRAFCET JSON (*.json)",
+            accept: { "application/json": [".json"] }
+          }]
+        });
+        currentFileName = currentFileHandle.name;
+        updateProjectNameUI(currentFileName);
+      }
+
+      const writable = await currentFileHandle.createWritable();
+      await writable.write(raw);
+      await writable.close();
+      showToast(`Salvo em "${currentFileName}"!`);
+      console.log(`Diagrama gravado com sucesso em ${currentFileName}`);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("Erro ao salvar com File System Access API, usando fallback:", err);
+        exportDiagram();
+      }
+    }
+  } else {
+    // Fallback transparente
+    exportDiagram();
   }
 }
 
 function exportDiagram() {
   saveDiagramToStorage();
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    alert("Nenhum diagrama para exportar.");
+  if (!raw || stepsList.length === 0) {
+    alert("Nenhum diagrama para salvar.");
     return;
   }
+  const filename = currentFileName || `grafcet_diagram_${Date.now()}.json`;
   const blob = new Blob([raw], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `grafcet_diagram_${Date.now()}.json`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+  showToast(`Download de "${filename}" concluído!`);
 }
 
 function triggerImportDiagram() {
@@ -1693,8 +1806,11 @@ function handleImportFile(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (restoreDiagram(data)) {
+        currentFileHandle = null;
+        currentFileName = file.name;
         saveDiagramToStorage();
-        alert("Diagrama importado com sucesso!");
+        updateProjectNameUI(currentFileName);
+        showToast(`Arquivo "${file.name}" carregado com sucesso!`);
       } else {
         alert("Arquivo JSON de diagrama inválido.");
       }
@@ -1705,6 +1821,14 @@ function handleImportFile(event) {
   reader.readAsText(file);
   event.target.value = "";
 }
+
+// Atalho de teclado global Ctrl+S / Cmd+S
+window.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    saveProject();
+  }
+});
 
 window.addEventListener("beforeunload", saveDiagramToStorage);
 setTimeout(() => {

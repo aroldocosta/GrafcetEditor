@@ -15,28 +15,27 @@
         <span class="brand-icon">⚡</span>
         <span class="brand-title">GRAFCET Editor</span>
       </div>
+      <div class="project-tag" id="project-file-display" title="Arquivo do Projeto Atual">
+        <span class="file-status-icon">📄</span>
+        <span id="current-project-label">Sem título</span>
+      </div>
     </div>
 
     <div class="top-bar-right">
       <div class="toolbar-group">
-        <button class="top-btn btn-import" onclick="triggerImportDiagram()" title="Importar Diagrama JSON">
-          <span class="btn-icon">📁</span>
-          <span>IMPORTAR JSON</span>
+        <button class="top-btn btn-new" onclick="newDiagram()" title="Iniciar novo diagrama em branco">
+          <span class="btn-icon">📄</span>
+          <span>NOVO</span>
         </button>
-        <button class="top-btn btn-export" onclick="exportDiagram()" title="Exportar Diagrama JSON">
+        <button class="top-btn btn-open" onclick="openProject()" title="Abrir arquivo de projeto (JSON)">
+          <span class="btn-icon">📂</span>
+          <span>ABRIR</span>
+        </button>
+        <button class="top-btn btn-save" onclick="saveProject()" title="Salvar projeto no disco (Ctrl+S)">
           <span class="btn-icon">💾</span>
-          <span>EXPORTAR JSON</span>
+          <span>SALVAR</span>
         </button>
         <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
-      </div>
-
-      <div class="toolbar-divider"></div>
-
-      <div class="toolbar-group">
-        <button class="top-btn btn-clear" onclick="clearDiagram()" title="Limpar todo o diagrama">
-          <span class="btn-icon">🗑️</span>
-          <span>LIMPAR DIAGRAMA</span>
-        </button>
       </div>
 
       <div class="toolbar-divider"></div>
@@ -166,6 +165,8 @@
       </div>
     </div>
   </div>
+
+  <div id="toast-notification" class="toast-notification"></div>
 
   <script src="step.js?v=17"></script>
   <script src="transition.js?v=17"></script>

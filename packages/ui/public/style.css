@@ -55,6 +55,31 @@ body {
   color: #38bdf8;
 }
 
+.project-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #334155;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-tag .file-status-icon {
+  font-size: 12px;
+}
+
+#current-project-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 .top-bar-right {
   display: flex;
   align-items: center;
@@ -109,6 +134,33 @@ body {
   align-items: center;
 }
 
+.btn-new {
+  background: #475569;
+  color: #ffffff;
+  border-color: #64748b;
+}
+.btn-new:hover {
+  background: #334155;
+}
+
+.btn-open {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: #14b8a6;
+}
+.btn-open:hover {
+  background: #115e59;
+}
+
+.btn-save {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0ea5e9;
+}
+.btn-save:hover {
+  background: #0369a1;
+}
+
 .btn-compile {
   background: #2563eb;
   color: #ffffff;
@@ -121,31 +173,51 @@ body {
   border-color: #60a5fa;
 }
 
+/* Mantendo compatibilidade com classes anteriores */
 .btn-export {
   background: #0284c7;
   color: #ffffff;
   border-color: #0ea5e9;
 }
-.btn-export:hover {
-  background: #0369a1;
-}
-
 .btn-import {
   background: #0f766e;
   color: #ffffff;
   border-color: #14b8a6;
 }
-.btn-import:hover {
-  background: #115e59;
-}
-
 .btn-clear {
   background: #dc2626;
   color: #ffffff;
   border-color: #ef4444;
 }
-.btn-clear:hover {
-  background: #b91c1c;
+
+/* Toast notification flutuante */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-left: 4px solid #10b981;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-notification.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 /* ==========================================================================
