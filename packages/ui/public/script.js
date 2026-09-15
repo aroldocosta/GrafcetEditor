@@ -41,10 +41,15 @@ palette.querySelectorAll(".box").forEach(box => {
     }
     setTimeout(() => document.body.removeChild(clone), 0);
   });
+
+  box.addEventListener("dragend", () => {
+    _draggedType = null;
+  });
 });
 
 function handleCanvasDrop(e) {
   e.preventDefault();
+  e.stopPropagation();
   let type = e.dataTransfer ? e.dataTransfer.getData("type") : null;
   if (!type) {
     type = _draggedType || "active_step";
@@ -114,20 +119,21 @@ function handleCanvasDrop(e) {
 
   printSteps();
   debouncedSaveDiagram();
+  _draggedType = null;
 }
 
-canvas.addEventListener("dragover", e => {
+function handleDragOver(e) {
   e.preventDefault();
+  e.stopPropagation();
   if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-});
+}
+
+canvas.addEventListener("dragover", handleDragOver);
 canvas.addEventListener("drop", handleCanvasDrop);
 
 const canvasViewportEl = document.getElementById("canvas-viewport");
 if (canvasViewportEl) {
-  canvasViewportEl.addEventListener("dragover", e => {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-  });
+  canvasViewportEl.addEventListener("dragover", handleDragOver);
   canvasViewportEl.addEventListener("drop", handleCanvasDrop);
 }
 
