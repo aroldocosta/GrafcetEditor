@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@grafcet/core");
 // Garantir que os geradores estão registrados
 core_1.CodeGeneratorRegistry.register(new core_1.Userver03Generator());
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3501;
 const server = Bun.serve({
     port: PORT,
     async fetch(req) {

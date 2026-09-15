@@ -6,7 +6,7 @@ import { CodeGeneratorRegistry, Userver03Generator, GrafcetIR } from '@grafcet/c
 // Garantir que os geradores estão registrados
 CodeGeneratorRegistry.register(new Userver03Generator());
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3501;
 
 const server = Bun.serve({
   port: PORT,

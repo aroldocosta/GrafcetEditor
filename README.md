@@ -25,8 +25,8 @@ GrafcetEditor/
 ```bash
 bun dev
 ```
-* **Interface Web (Editor):** `http://localhost:8080`
-* **Servidor HTTP Deploy (Backend):** `http://localhost:3000`
+* **Interface Web (Editor):** `http://localhost:3500`
+* **Servidor HTTP Deploy (Backend):** `http://localhost:3501`
 
 ---
 
