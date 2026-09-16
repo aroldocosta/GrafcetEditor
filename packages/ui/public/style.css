@@ -629,18 +629,18 @@ body {
 #canvas-wrapper {
   margin: auto;
   padding: 60px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  min-width: max-content;
-  min-height: max-content;
+  flex-shrink: 0;
+  box-sizing: content-box;
+  display: block;
 }
 
 #canvas {
   width: 3200px;
   height: 2400px;
-  position: relative;
+  position: absolute;
+  top: 60px;
+  left: 60px;
   background: #ffffff;
   background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
   background-size: 20px 20px;

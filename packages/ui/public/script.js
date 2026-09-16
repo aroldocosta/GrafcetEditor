@@ -1845,7 +1845,7 @@ window.addEventListener("keydown", e => {
 window.addEventListener("beforeunload", saveDiagramToStorage);
 setTimeout(() => {
   const loaded = loadDiagramFromStorage();
-  // Centraliza a visão inicial no meio do canvas de 4 folhas
+  updateCanvasWrapperSize();
   centerCanvasViewport();
 }, 100);
 
@@ -1854,6 +1854,14 @@ setTimeout(() => {
    ========================================================================== */
 
 const viewport = document.getElementById("canvas-viewport");
+
+function updateCanvasWrapperSize() {
+  const wrapper = document.getElementById("canvas-wrapper");
+  if (wrapper) {
+    wrapper.style.width = `${3200 * currentZoom}px`;
+    wrapper.style.height = `${2400 * currentZoom}px`;
+  }
+}
 
 function getMinZoom() {
   if (!viewport) return 0.25;
@@ -1892,6 +1900,7 @@ function setZoom(newZoom, clientX, clientY) {
   currentZoom = clampedZoom;
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${currentZoom})`;
+  updateCanvasWrapperSize();
 
   // Reposiciona o scroll para manter o ponto fixo no mesmo local da tela
   viewport.scrollLeft = worldX * currentZoom - mouseX;
