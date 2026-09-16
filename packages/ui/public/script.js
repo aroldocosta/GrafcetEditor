@@ -12,7 +12,7 @@ let clickTimeout = null;
 let currentZoom = 1.0;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.5;
-const ZOOM_STEP = 0.1;
+const ZOOM_STEP = 0.01;
 
 const STORAGE_KEY = "grafcet_saved_diagram";
 let saveTimeout = null;
@@ -1864,8 +1864,8 @@ function updateZoomDisplay() {
 
 function setZoom(newZoom, clientX, clientY) {
   if (!viewport || !canvas) return;
-  const clampedZoom = Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM);
-  if (Math.abs(clampedZoom - currentZoom) < 0.001) return;
+  const clampedZoom = Math.round(Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM) * 100) / 100;
+  if (Math.abs(clampedZoom - currentZoom) < 0.005) return;
 
   const previousZoom = currentZoom;
   const rect = viewport.getBoundingClientRect();
@@ -1965,8 +1965,11 @@ if (viewport) {
   viewport.addEventListener("wheel", e => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      // Ajuste proporcional do zoom; deltaY pode ser contínuo (touchpad) ou discreto (wheel)
-      const zoomDelta = -e.deltaY * 0.0015;
+      // Se for tick discreto da roda do mouse, avança exatamente 1 passo (1%)
+      // Se for trackpad/gesto de pinça (deltaY fracionário e contínuo), calcula proporcionalmente
+      const zoomDelta = (e.deltaMode === 0 && Math.abs(e.deltaY) < 30)
+        ? -e.deltaY * 0.0005
+        : -Math.sign(e.deltaY) * ZOOM_STEP;
       setZoom(currentZoom + zoomDelta, e.clientX, e.clientY);
     } else if (e.shiftKey) {
       e.preventDefault();
