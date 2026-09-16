@@ -19,6 +19,47 @@ let saveTimeout = null;
 
 let _draggedType = null;
 
+// ==========================================================================
+// Gerenciamento de Seleção Múltipla
+// ==========================================================================
+const selectedBoxes = new Set();
+
+function selectBox(box, additive = false) {
+  if (!additive) {
+    clearSelection();
+  }
+  selectedBoxes.add(box);
+  box.classList.add("selected");
+}
+
+function deselectBox(box) {
+  selectedBoxes.delete(box);
+  box.classList.remove("selected");
+}
+
+function toggleBoxSelection(box) {
+  if (selectedBoxes.has(box)) {
+    deselectBox(box);
+  } else {
+    selectedBoxes.add(box);
+    box.classList.add("selected");
+  }
+}
+
+function clearSelection() {
+  selectedBoxes.forEach(b => b.classList.remove("selected"));
+  selectedBoxes.clear();
+}
+
+function selectAllBoxes() {
+  clearSelection();
+  const boxes = canvas.querySelectorAll(".box");
+  boxes.forEach(b => {
+    selectedBoxes.add(b);
+    b.classList.add("selected");
+  });
+}
+
 palette.querySelectorAll(".box").forEach(box => {
   box.addEventListener("dragstart", e => {
     let type = "active_step";
@@ -159,16 +200,40 @@ canvas.addEventListener("click", e => {
 });
 
 function makeDraggable(box) {
-  let startX, startY, boxStartLeft, boxStartTop;
+  let startX, startY;
   let moved = false;
+  const initialPositions = new Map();
 
   box.addEventListener("mousedown", e => {
     if (e.target.classList.contains("connector")) return;
+    if (e.button !== 0) return; // Apenas botão esquerdo para arrastar
+
+    e.stopPropagation();
+
     startX = e.clientX;
     startY = e.clientY;
-    boxStartLeft = parseFloat(box.style.left);
-    boxStartTop = parseFloat(box.style.top);
     moved = false;
+
+    // Gerenciamento da seleção no clique do bloco
+    if (e.shiftKey) {
+      toggleBoxSelection(box);
+      if (!selectedBoxes.has(box)) return; // Se removeu da seleção, não arrasta
+    } else {
+      // Se não estiver no grupo selecionado, seleciona apenas ele
+      if (!selectedBoxes.has(box)) {
+        selectBox(box);
+      }
+      // Se já estava selecionado, mantém o grupo ativo para arrastar todos juntos
+    }
+
+    // Grava as posições iniciais de TODOS os blocos do grupo selecionado
+    initialPositions.clear();
+    selectedBoxes.forEach(b => {
+      initialPositions.set(b, {
+        left: parseFloat(b.style.left) || 0,
+        top: parseFloat(b.style.top) || 0
+      });
+    });
 
     function move(ev) {
       const dx = (ev.clientX - startX) / currentZoom;
@@ -176,15 +241,27 @@ function makeDraggable(box) {
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
         moved = true;
       }
-      box.style.left = boxStartLeft + dx + "px";
-      box.style.top = boxStartTop + dy + "px";
-      updateConnections(box);
+
+      selectedBoxes.forEach(b => {
+        const init = initialPositions.get(b);
+        if (init) {
+          b.style.left = (init.left + dx) + "px";
+          b.style.top = (init.top + dy) + "px";
+          updateConnections(b);
+        }
+      });
     }
 
     function up() {
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
-      // Quando soltar, marca na propriedade dataset se moveu
+
+      // Se foi apenas um clique simples (sem arraste) e havia múltiplos selecionados:
+      // se não foi com Shift, foca a seleção exclusivamente neste bloco
+      if (!moved && !e.shiftKey && selectedBoxes.size > 1) {
+        selectBox(box);
+      }
+
       box.dataset.wasMoved = moved ? "true" : "false";
       if (moved) {
         debouncedSaveDiagram();
@@ -583,6 +660,7 @@ function attachRemoveListener(box) {
         printSteps();
       }
     }
+    selectedBoxes.delete(box);
     canvas.removeChild(box);
 
     const stepIndex = stepsList.findIndex(s => s.element === box);
@@ -1477,6 +1555,7 @@ function clearCanvasDOM() {
 
   stepsList.length = 0;
   connections.length = 0;
+  clearSelection();
 }
 
 function restoreDiagram(data) {
@@ -1940,24 +2019,43 @@ function centerCanvasViewport() {
   });
 }
 
-// 1. Navegação via Clique e Arrasta (Pan Mode)
+// 1. Navegação Pan e Seleção Elástica (Marquee Selection)
 let isPanning = false;
 let startX = 0;
 let startY = 0;
 let startScrollLeft = 0;
 let startScrollTop = 0;
+let isSpacePressed = false;
+
+window.addEventListener("keydown", e => {
+  if (e.code === "Space" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    isSpacePressed = true;
+    document.body.classList.add("space-pressed");
+  }
+});
+
+window.addEventListener("keyup", e => {
+  if (e.code === "Space") {
+    isSpacePressed = false;
+    document.body.classList.remove("space-pressed");
+  }
+});
 
 if (viewport) {
   viewport.addEventListener("mousedown", e => {
-    // Permite Pan se for botão do meio (1), botão direito (2), ou clique no fundo (canvas, wrapper, viewport)
     const isCanvasBg = e.target === canvas || 
       e.target === viewport || 
       e.target.id === "canvas-wrapper" || 
       e.target.classList.contains("quadrant-divider") || 
       e.target.tagName.toLowerCase() === "svg";
-    const isPanButton = e.button === 1 || e.button === 2 || (e.button === 0 && isCanvasBg);
 
-    if (isPanButton) {
+    // Pan é ativado por:
+    // 1. Botão do Meio (1)
+    // 2. Botão Direito (2)
+    // 3. Barra de Espaço + Botão Esquerdo (0)
+    const isPanAction = e.button === 1 || e.button === 2 || (isSpacePressed && e.button === 0);
+
+    if (isPanAction) {
       if (e.button === 2) e.preventDefault(); // Previne menu de contexto se botão direito
       isPanning = true;
       startX = e.clientX;
@@ -1965,6 +2063,76 @@ if (viewport) {
       startScrollLeft = viewport.scrollLeft;
       startScrollTop = viewport.scrollTop;
       viewport.classList.add("panning");
+      return;
+    }
+
+    // Se for Botão Esquerdo puro (0) no fundo sem barra de espaço:
+    // Inicia a Caixa Elástica de Seleção (Marquee Selection)
+    if (e.button === 0 && isCanvasBg) {
+      const marqueeEl = document.getElementById("selection-marquee");
+      const rect = canvas.getBoundingClientRect();
+      const startCanvasX = (e.clientX - rect.left) / currentZoom;
+      const startCanvasY = (e.clientY - rect.top) / currentZoom;
+      let isMarquee = false;
+      const initialSelected = e.shiftKey ? new Set(selectedBoxes) : new Set();
+
+      function onMarqueeMove(ev) {
+        const currentCanvasX = (ev.clientX - rect.left) / currentZoom;
+        const currentCanvasY = (ev.clientY - rect.top) / currentZoom;
+
+        const mx = Math.min(startCanvasX, currentCanvasX);
+        const my = Math.min(startCanvasY, currentCanvasY);
+        const mw = Math.abs(currentCanvasX - startCanvasX);
+        const mh = Math.abs(currentCanvasY - startCanvasY);
+
+        if (mw > 3 || mh > 3) {
+          isMarquee = true;
+          if (marqueeEl) {
+            marqueeEl.style.display = "block";
+            marqueeEl.style.left = `${mx}px`;
+            marqueeEl.style.top = `${my}px`;
+            marqueeEl.style.width = `${mw}px`;
+            marqueeEl.style.height = `${mh}px`;
+          }
+
+          // Teste de interseção AABB com os blocos presentes no canvas
+          const boxes = canvas.querySelectorAll(".box");
+          boxes.forEach(b => {
+            const bLeft = parseFloat(b.style.left) || 0;
+            const bTop = parseFloat(b.style.top) || 0;
+            const bWidth = b.offsetWidth || 100;
+            const bHeight = b.offsetHeight || 100;
+
+            const intersects = (mx < bLeft + bWidth) && (mx + mw > bLeft) &&
+                               (my < bTop + bHeight) && (my + mh > bTop);
+
+            if (intersects) {
+              selectedBoxes.add(b);
+              b.classList.add("selected");
+            } else if (!initialSelected.has(b)) {
+              selectedBoxes.delete(b);
+              b.classList.remove("selected");
+            }
+          });
+        }
+      }
+
+      function onMarqueeUp() {
+        window.removeEventListener("mousemove", onMarqueeMove);
+        window.removeEventListener("mouseup", onMarqueeUp);
+
+        if (marqueeEl) {
+          marqueeEl.style.display = "none";
+        }
+
+        // Se foi apenas um clique simples no fundo sem arrastar e sem Shift, limpa a seleção
+        if (!isMarquee && !e.shiftKey) {
+          clearSelection();
+        }
+      }
+
+      window.addEventListener("mousemove", onMarqueeMove);
+      window.addEventListener("mouseup", onMarqueeUp);
     }
   });
 
@@ -2040,12 +2208,25 @@ document.getElementById("nav-zoom-reset")?.addEventListener("click", () => {
   resetZoom();
 });
 
-// 4. Atalhos de Teclado Globais para Zoom
+// 4. Atalhos de Teclado Globais para Zoom e Seleção
 window.addEventListener("keydown", e => {
   if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
     return;
   }
 
+  // Atalhos de Seleção Múltipla
+  if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+    e.preventDefault();
+    selectAllBoxes();
+    return;
+  }
+
+  if (e.key === "Escape") {
+    clearSelection();
+    return;
+  }
+
+  // Atalhos de Zoom
   if (e.ctrlKey || e.metaKey) {
     if (e.shiftKey && (e.key === "0" || e.code === "Numpad0" || e.key === ")")) {
       e.preventDefault();

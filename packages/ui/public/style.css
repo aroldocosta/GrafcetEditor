@@ -289,6 +289,37 @@ body {
   margin-bottom: 10px;
 }
 
+/* Destaque de Seleção Múltipla */
+.box.selected {
+  outline: 2.5px solid #2563eb !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25) !important;
+  z-index: 10 !important;
+  cursor: grab;
+}
+
+.box.selected:active {
+  cursor: grabbing;
+}
+
+/* Caixa Elástica de Seleção (Marquee) */
+#selection-marquee {
+  position: absolute;
+  border: 1.5px dashed #2563eb;
+  background-color: rgba(37, 99, 235, 0.14);
+  pointer-events: none;
+  z-index: 999;
+  border-radius: 2px;
+}
+
+body.space-pressed #canvas-viewport {
+  cursor: grab !important;
+}
+
+body.space-pressed #canvas-viewport:active {
+  cursor: grabbing !important;
+}
+
 .inner-rect {
   position: absolute;
   top: var(--inner-rect-top);
