@@ -613,9 +613,12 @@ body {
   flex: 1;
   position: relative;
   overflow: auto;
-  background: #cbd5e1;
+  background-color: #dbe2ea;
+  background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
   scroll-behavior: smooth;
   user-select: none;
+  display: flex;
 }
 
 #canvas-viewport.panning {
@@ -623,16 +626,28 @@ body {
   scroll-behavior: auto !important;
 }
 
+#canvas-wrapper {
+  margin: auto;
+  padding: 60px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-width: max-content;
+  min-height: max-content;
+}
+
 #canvas {
   width: 3200px;
   height: 2400px;
-  min-width: 200%;
-  min-height: 200%;
   position: relative;
   background: #ffffff;
   background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
   background-size: 20px 20px;
   transform-origin: 0 0;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.08);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
 }
 
 /* Divisores de Folhas (Quadrantes 2x2) */

@@ -1855,6 +1855,15 @@ setTimeout(() => {
 
 const viewport = document.getElementById("canvas-viewport");
 
+function getMinZoom() {
+  if (!viewport) return 0.25;
+  const padding = 120; // 60px de respiro em cada lado
+  const fitX = (viewport.clientWidth - padding) / 3200;
+  const fitY = (viewport.clientHeight - padding) / 2400;
+  // Enquadra as 4 folhas perfeitamente na janela do usuário (com piso seguro de 20% e teto de 50%)
+  return Math.round(Math.max(0.20, Math.min(fitX, fitY, 0.50)) * 100) / 100;
+}
+
 function updateZoomDisplay() {
   const resetBtn = document.getElementById("nav-zoom-reset");
   if (resetBtn) {
@@ -1864,7 +1873,8 @@ function updateZoomDisplay() {
 
 function setZoom(newZoom, clientX, clientY) {
   if (!viewport || !canvas) return;
-  const clampedZoom = Math.round(Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM) * 100) / 100;
+  const minZoom = getMinZoom();
+  const clampedZoom = Math.round(Math.min(Math.max(newZoom, minZoom), MAX_ZOOM) * 100) / 100;
   if (Math.abs(clampedZoom - currentZoom) < 0.005) return;
 
   const previousZoom = currentZoom;
@@ -1902,15 +1912,21 @@ function resetZoom() {
   setZoom(1.0);
 }
 
+function zoomToFit() {
+  if (!viewport || !canvas) return;
+  setZoom(getMinZoom());
+  setTimeout(() => {
+    centerCanvasViewport();
+  }, 50);
+}
+
 function centerCanvasViewport() {
   if (!viewport || !canvas) return;
-  const canvasWidth = canvas.offsetWidth * currentZoom;
-  const canvasHeight = canvas.offsetHeight * currentZoom;
-  const scrollLeft = (canvasWidth - viewport.clientWidth) / 2;
-  const scrollTop = (canvasHeight - viewport.clientHeight) / 2;
+  const scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2;
+  const scrollTop = (viewport.scrollHeight - viewport.clientHeight) / 2;
   viewport.scrollTo({
-    left: scrollLeft,
-    top: scrollTop,
+    left: Math.max(0, scrollLeft),
+    top: Math.max(0, scrollTop),
     behavior: 'smooth'
   });
 }
@@ -1924,8 +1940,12 @@ let startScrollTop = 0;
 
 if (viewport) {
   viewport.addEventListener("mousedown", e => {
-    // Permite Pan se for botão do meio (1), botão direito (2), ou clique no fundo do canvas
-    const isCanvasBg = e.target === canvas || e.target === viewport || e.target.classList.contains("quadrant-divider") || e.target.tagName.toLowerCase() === "svg";
+    // Permite Pan se for botão do meio (1), botão direito (2), ou clique no fundo (canvas, wrapper, viewport)
+    const isCanvasBg = e.target === canvas || 
+      e.target === viewport || 
+      e.target.id === "canvas-wrapper" || 
+      e.target.classList.contains("quadrant-divider") || 
+      e.target.tagName.toLowerCase() === "svg";
     const isPanButton = e.button === 1 || e.button === 2 || (e.button === 0 && isCanvasBg);
 
     if (isPanButton) {
@@ -1991,8 +2011,15 @@ document.getElementById("nav-left")?.addEventListener("click", () => {
 document.getElementById("nav-right")?.addEventListener("click", () => {
   if (viewport) viewport.scrollBy({ left: 300, behavior: 'smooth' });
 });
-document.getElementById("nav-center")?.addEventListener("click", () => {
-  centerCanvasViewport();
+document.getElementById("nav-center")?.addEventListener("click", e => {
+  if (e.shiftKey || e.ctrlKey) {
+    zoomToFit();
+  } else {
+    centerCanvasViewport();
+  }
+});
+document.getElementById("nav-center")?.addEventListener("dblclick", () => {
+  zoomToFit();
 });
 document.getElementById("nav-zoom-in")?.addEventListener("click", () => {
   zoomIn();
@@ -2011,7 +2038,10 @@ window.addEventListener("keydown", e => {
   }
 
   if (e.ctrlKey || e.metaKey) {
-    if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") {
+    if (e.shiftKey && (e.key === "0" || e.code === "Numpad0" || e.key === ")")) {
+      e.preventDefault();
+      zoomToFit();
+    } else if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") {
       e.preventDefault();
       zoomIn();
     } else if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") {
