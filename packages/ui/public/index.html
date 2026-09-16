@@ -5,7 +5,8 @@
   <meta charset="UTF-8" />
   <title>Drag & Drop GRAFCET</title>
   <link rel="stylesheet" href="modal.css">
-  <link rel="stylesheet" href="style.css?v=20" />
+  <link rel="stylesheet" href="style.css?v=22" />
+  <link rel="stylesheet" href="simulation-rack.css?v=22" />
 </head>
 
 <body>
@@ -45,6 +46,20 @@
           <span class="btn-icon">⚙️</span>
           <span>COMPILAR</span>
         </button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group sim-toolbar-group">
+        <button class="top-btn btn-sim-play" id="btn-toggle-simulation" onclick="toggleSimulationMode()" title="Iniciar / Encerrar Simulação Interativa (F5)">
+          <span class="btn-icon" id="sim-main-icon">▶</span>
+          <span id="sim-main-label">SIMULAR</span>
+        </button>
+        <button class="top-btn btn-sim-step" id="btn-step-simulation" onclick="stepSimulationMode()" style="display: none;" title="Executar 1 Ciclo de Scan (F10)">
+          <span class="btn-icon">⏭</span>
+          <span>PASSO</span>
+        </button>
+        <span class="sim-status-badge stopped" id="sim-status-display" style="display: none;">PARADO</span>
       </div>
     </div>
   </header>
@@ -177,11 +192,28 @@
 
   <div id="toast-notification" class="toast-notification"></div>
 
-  <script src="step.js?v=21"></script>
-  <script src="transition.js?v=21"></script>
-  <script src="action.js?v=21"></script>
-  <script src="script.js?v=21"></script>
-  <script src="compiler.js?v=21"></script>
+  <!-- Painel Retrátil de Simulação (I/O Rack Industrial) -->
+  <div id="simulation-dock" style="display: none;">
+    <div class="dock-header">
+      <div class="dock-title">
+        <span>🎛️ PAINEL DE E/S DO SIMULADOR (RACK INDUSTRIAL)</span>
+      </div>
+      <div class="dock-controls">
+        <button class="dock-toggle-btn" id="dock-toggle-btn">▼ Recolher</button>
+      </div>
+    </div>
+    <div class="dock-body" id="simulation-dock-body">
+      <!-- Módulos de E/S gerados dinamicamente via simulation-rack.js -->
+    </div>
+  </div>
+
+  <script src="step.js?v=22"></script>
+  <script src="transition.js?v=22"></script>
+  <script src="action.js?v=22"></script>
+  <script src="compiler.js?v=22"></script>
+  <script src="simulation-engine.js?v=22"></script>
+  <script src="simulation-rack.js?v=22"></script>
+  <script src="script.js?v=22"></script>
 </body>
 
 </html>

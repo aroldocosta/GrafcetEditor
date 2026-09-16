@@ -1,0 +1,421 @@
+/* ==========================================================================
+   Simulation Rack & Industrial Instrument Panel CSS (GrafcetEditor)
+   ========================================================================== */
+
+/* Barra de Controle de Simulação no Topo */
+.sim-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 3px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-sim-play {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: 1px solid #34d399;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+}
+.btn-sim-play:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.btn-sim-pause {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: 1px solid #fbbf24;
+}
+
+.btn-sim-step {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: 1px solid #60a5fa;
+}
+
+.btn-sim-stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: 1px solid #f87171;
+}
+
+.sim-status-badge {
+  font-size: 11px;
+  font-family: monospace;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.sim-status-badge.running {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid #10b981;
+  animation: pulse-glow 1.5s infinite;
+}
+
+.sim-status-badge.paused {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid #f59e0b;
+}
+
+.sim-status-badge.stopped {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  border: 1px solid #64748b;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 2px rgba(16, 185, 129, 0.1); }
+}
+
+/* Gaveta Retrátil de I/O na Base da Tela */
+#simulation-dock {
+  position: fixed;
+  bottom: 0;
+  left: 260px; /* alinhado após a paleta lateral */
+  right: 0;
+  background: #0f172a;
+  border-top: 2px solid #3b82f6;
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.35);
+  z-index: 1200;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  color: #f1f5f9;
+  user-select: none;
+}
+
+#simulation-dock.collapsed {
+  transform: translateY(calc(100% - 32px));
+}
+
+.dock-header {
+  height: 32px;
+  background: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #334155;
+}
+
+.dock-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #93c5fd;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dock-toggle-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.dock-toggle-btn:hover {
+  background: #334155;
+  color: white;
+}
+
+.dock-body {
+  padding: 14px 20px;
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  max-height: 220px;
+  align-items: flex-start;
+}
+
+/* Módulos do Rack Industrial */
+.rack-module {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.05);
+}
+
+.module-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.module-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Botões Táteis (Pushbuttons Digitais) */
+.pushbutton-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pushbutton-label {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: monospace;
+  color: #cbd5e1;
+}
+
+.pushbutton {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #334155;
+  background: radial-gradient(circle at 35% 35%, #22c55e, #15803d);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4), inset 0 2px 3px rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: transform 0.05s ease, box-shadow 0.05s ease;
+  outline: none;
+}
+
+.pushbutton:active, .pushbutton.pressed {
+  transform: translateY(2px) scale(0.96);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 3px 5px rgba(0, 0, 0, 0.5);
+  background: radial-gradient(circle at 50% 50%, #16a34a, #14532d);
+}
+
+/* Chave Comutadora / Toggle Switch */
+.switch-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-toggle {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #475569;
+  border-radius: 24px;
+  transition: 0.2s;
+  border: 1px solid #64748b;
+}
+
+.slider-toggle:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #f1f5f9;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.toggle-switch input:checked + .slider-toggle {
+  background-color: #3b82f6;
+  border-color: #60a5fa;
+}
+
+.toggle-switch input:checked + .slider-toggle:before {
+  transform: translateX(20px);
+}
+
+/* Sliders Analógicos */
+.analog-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 160px;
+}
+
+.analog-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: monospace;
+  color: #cbd5e1;
+}
+
+.analog-value-badge {
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid #1e293b;
+}
+
+.analog-slider-input {
+  width: 100%;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+/* LEDs Indicadores de Saídas (Q) */
+.led-indicator-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.led-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #334155;
+  border: 2px solid #475569;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+}
+
+.led-indicator.on {
+  background: #22c55e;
+  border-color: #86efac;
+  box-shadow: 0 0 12px #22c55e, inset 0 1px 3px #bbf7d0;
+}
+
+/* Relé Animado com Contato NA/NF */
+.relay-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: all 0.15s;
+}
+
+.relay-icon-wrapper.energized {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+}
+
+/* Temporizadores (Timers) */
+.timer-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 140px;
+}
+
+.timer-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: monospace;
+  color: #cbd5e1;
+}
+
+.timer-progress-bg {
+  width: 100%;
+  height: 8px;
+  background: #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.timer-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  transition: width 0.05s linear;
+}
+
+.timer-progress-fill.done {
+  background: #22c55e;
+}
+
+/* ==========================================================================
+   Realce Reativo no Canvas durante a Simulação
+   ========================================================================== */
+
+/* Etapa Ativa */
+.box.sim-active-step .inner-rect {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #93c5fd !important;
+  box-shadow: 0 0 16px #3b82f6, 0 0 28px rgba(59, 130, 246, 0.6) !important;
+  animation: step-pulsing 1.8s infinite alternate !important;
+}
+
+@keyframes step-pulsing {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.04); filter: brightness(1.2); }
+}
+
+/* Transição Franqueável (Validada e Receptiva) */
+.transition.sim-ready,
+.branch-transition.sim-ready {
+  background: #22c55e !important;
+  box-shadow: 0 0 12px #22c55e, 0 0 20px rgba(34, 197, 94, 0.8) !important;
+  animation: trans-ready 0.8s infinite alternate;
+}
+
+@keyframes trans-ready {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; filter: drop-shadow(0 0 6px #22c55e); }
+}
+
+/* Modo Simulação Ativo no Canvas */
+body.sim-mode-active #canvas {
+  cursor: default !important;
+}
+
+body.sim-mode-active #canvas .box {
+  cursor: pointer !important;
+}
+
+body.sim-mode-active #palette {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.5);
+}

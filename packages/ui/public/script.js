@@ -8,6 +8,9 @@ let transitionCounter = 0;
 let boxCounter = 0;
 let clickTimeout = null;
 
+// Modo de Simulação Virtual IEC 60848
+let isSimulationActive = false;
+
 // Controle de Zoom do Canvas
 let currentZoom = 1.0;
 const MIN_ZOOM = 0.25;
@@ -97,6 +100,12 @@ palette.querySelectorAll(".box").forEach(box => {
 function handleCanvasDrop(e) {
   e.preventDefault();
   e.stopPropagation();
+  if (isSimulationActive) {
+    if (typeof showToast === "function") {
+      showToast("Modo Simulação ativo. Pare a simulação para adicionar novos elementos.");
+    }
+    return;
+  }
   let type = e.dataTransfer ? e.dataTransfer.getData("type") : null;
   if (!type) {
     type = _draggedType || "active_step";
@@ -209,6 +218,21 @@ function makeDraggable(box) {
     if (e.button !== 0) return; // Apenas botão esquerdo para arrastar
 
     e.stopPropagation();
+
+    // Em modo de simulação, o clique em uma etapa alterna o forçamento manual (IEC 60848)
+    if (isSimulationActive) {
+      const rawId = box.getAttribute("data-id");
+      const stepId = parseInt(rawId, 10);
+      const innerText = box.querySelector(".inner-rect")?.textContent?.trim();
+      const visualId = innerText ? parseInt(innerText, 10) : NaN;
+      if (window.simulationRack && window.simulationRack.engine) {
+        const engine = window.simulationRack.engine;
+        const targetId = !isNaN(visualId) && engine.ir?.steps?.some(s => s.id === visualId) ? visualId : stepId;
+        const isCurrentActive = engine.activeSteps.has(targetId);
+        engine.forceStep(targetId, !isCurrentActive);
+      }
+      return;
+    }
 
     startX = e.clientX;
     startY = e.clientY;
@@ -339,6 +363,7 @@ function attachConnectorListeners(box) {
   box.querySelectorAll(".connector").forEach(connector => {
     connector.addEventListener("click", e => {
       e.stopPropagation();
+      if (isSimulationActive) return;
       const svg = getOrCreateSVG();
       const rect = canvas.getBoundingClientRect();
       const connRect = connector.getBoundingClientRect();
@@ -563,6 +588,7 @@ function attachHoverListeners(box) {
 
       bt.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (isSimulationActive) return;
         if (shouldIgnoreClickDueToMove(box)) return;
         const stepId = parseInt(box.getAttribute("data-id"));
         const step = stepsList.find(s => s.id === stepId);
@@ -588,9 +614,23 @@ function attachHoverListeners(box) {
 
     inner.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (isSimulationActive) {
+        const rawId = box.getAttribute("data-id");
+        const stepId = parseInt(rawId, 10);
+        const innerText = inner.textContent?.trim();
+        const visualId = innerText ? parseInt(innerText, 10) : NaN;
+        if (window.simulationRack && window.simulationRack.engine) {
+          const engine = window.simulationRack.engine;
+          const targetId = !isNaN(visualId) && engine.ir?.steps?.some(s => s.id === visualId) ? visualId : stepId;
+          const isCurrentActive = engine.activeSteps.has(targetId);
+          engine.forceStep(targetId, !isCurrentActive);
+        }
+        return;
+      }
       if (shouldIgnoreClickDueToMove(box)) return;
 
       clickTimeout = setTimeout(() => {
+        if (isSimulationActive) return;
         const stepId = parseInt(box.getAttribute("data-id"));
         const step = stepsList.find(s => s.id === stepId);
         if (step) {
@@ -611,6 +651,7 @@ function attachHoverListeners(box) {
 
     transitionBar.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (isSimulationActive) return;
       if (shouldIgnoreClickDueToMove(box)) return;
 
       const stepId = parseInt(box.getAttribute("data-id"));
@@ -644,6 +685,7 @@ function attachHoverListeners(box) {
 function attachRemoveListener(box) {
   box.addEventListener("dblclick", (e) => {
     e.stopPropagation();
+    if (isSimulationActive) return;
 
     if (clickTimeout) {
       clearTimeout(clickTimeout);
@@ -1926,6 +1968,9 @@ setTimeout(() => {
   const loaded = loadDiagramFromStorage();
   updateCanvasWrapperSize();
   centerCanvasViewport();
+  if (window.simulationRack) {
+    window.simulationRack.init();
+  }
 }, 100);
 
 /* ==========================================================================
@@ -2068,7 +2113,7 @@ if (viewport) {
 
     // Se for Botão Esquerdo puro (0) no fundo sem barra de espaço:
     // Inicia a Caixa Elástica de Seleção (Marquee Selection)
-    if (e.button === 0 && isCanvasBg) {
+    if (e.button === 0 && isCanvasBg && !isSimulationActive) {
       const marqueeEl = document.getElementById("selection-marquee");
       const rect = canvas.getBoundingClientRect();
       const startCanvasX = (e.clientX - rect.left) / currentZoom;
@@ -2208,9 +2253,21 @@ document.getElementById("nav-zoom-reset")?.addEventListener("click", () => {
   resetZoom();
 });
 
-// 4. Atalhos de Teclado Globais para Zoom e Seleção
+// 4. Atalhos de Teclado Globais para Zoom, Seleção e Simulação
 window.addEventListener("keydown", e => {
   if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    return;
+  }
+
+  // Atalhos de Simulação
+  if (e.key === "F5") {
+    e.preventDefault();
+    toggleSimulationMode();
+    return;
+  }
+  if (e.key === "F10") {
+    e.preventDefault();
+    stepSimulationMode();
     return;
   }
 
@@ -2243,5 +2300,118 @@ window.addEventListener("keydown", e => {
     }
   }
 });
+
+/* ==========================================================================
+   Controles do Modo de Simulação Virtual GRAFCET (IEC 60848)
+   ========================================================================== */
+
+function toggleSimulationMode() {
+  const toggleBtn = document.getElementById("btn-toggle-simulation");
+  const stepBtn = document.getElementById("btn-step-simulation");
+  const simIcon = document.getElementById("sim-main-icon");
+  const simLabel = document.getElementById("sim-main-label");
+  const statusDisplay = document.getElementById("sim-status-display");
+  const rack = window.simulationRack;
+
+  if (!isSimulationActive) {
+    if (!stepsList || stepsList.length === 0) {
+      if (typeof showToast === "function") {
+        showToast("Adicione pelo menos uma etapa antes de simular o GRAFCET.", 3000);
+      } else {
+        alert("Adicione pelo menos uma etapa antes de simular o GRAFCET.");
+      }
+      return;
+    }
+
+    let ir = null;
+    try {
+      if (typeof buildGrafcetIR === "function") {
+        ir = buildGrafcetIR(stepsList);
+      }
+    } catch (err) {
+      console.error("Erro ao compilar GRAFCET para simulação:", err);
+      if (typeof showToast === "function") {
+        showToast("Erro na validação do diagrama para simulação.", 3000);
+      }
+      return;
+    }
+
+    if (!ir || !ir.steps || ir.steps.length === 0) {
+      if (typeof showToast === "function") {
+        showToast("Diagrama vazio ou sem etapas válidas para simular.", 3000);
+      }
+      return;
+    }
+
+    isSimulationActive = true;
+    clearSelection();
+    document.body.classList.add("sim-mode-active");
+
+    if (toggleBtn) {
+      toggleBtn.classList.add("btn-sim-stop");
+      toggleBtn.title = "Parar Simulação do GRAFCET (F5)";
+    }
+    if (simIcon) simIcon.textContent = "⏹";
+    if (simLabel) simLabel.textContent = "PARAR";
+
+    if (stepBtn) {
+      stepBtn.style.display = "inline-flex";
+    }
+    if (statusDisplay) {
+      statusDisplay.style.display = "inline-flex";
+    }
+
+    if (rack) {
+      rack.startSimulation(ir);
+    }
+
+    if (typeof showToast === "function") {
+      showToast("Simulação iniciada! Use o Rack de E/S ou clique nas etapas para forçar.", 3500);
+    }
+  } else {
+    isSimulationActive = false;
+    document.body.classList.remove("sim-mode-active");
+
+    if (toggleBtn) {
+      toggleBtn.classList.remove("btn-sim-stop");
+      toggleBtn.title = "Iniciar Simulação do GRAFCET (F5)";
+    }
+    if (simIcon) simIcon.textContent = "▶";
+    if (simLabel) simLabel.textContent = "SIMULAR";
+
+    if (stepBtn) {
+      stepBtn.style.display = "none";
+    }
+    if (statusDisplay) {
+      statusDisplay.style.display = "none";
+    }
+
+    if (rack) {
+      rack.stopSimulation();
+    }
+
+    if (typeof showToast === "function") {
+      showToast("Simulação finalizada.", 2000);
+    }
+  }
+}
+
+function stepSimulationMode() {
+  if (!isSimulationActive) {
+    toggleSimulationMode();
+    return;
+  }
+  const rack = window.simulationRack;
+  if (rack && rack.engine) {
+    rack.stepSimulation();
+  }
+}
+
+window.toggleSimulationMode = toggleSimulationMode;
+window.stepSimulationMode = stepSimulationMode;
+
+document.getElementById("btn-toggle-simulation")?.addEventListener("click", toggleSimulationMode);
+document.getElementById("btn-step-simulation")?.addEventListener("click", stepSimulationMode);
+
 
 
