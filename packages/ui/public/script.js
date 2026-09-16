@@ -8,6 +8,12 @@ let transitionCounter = 0;
 let boxCounter = 0;
 let clickTimeout = null;
 
+// Controle de Zoom do Canvas
+let currentZoom = 1.0;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.1;
+
 const STORAGE_KEY = "grafcet_saved_diagram";
 let saveTimeout = null;
 
@@ -70,8 +76,8 @@ function handleCanvasDrop(e) {
   const rect = canvas.getBoundingClientRect();
   const isBranch = type === "or_divergence" || type === "or_convergence" || type === "and_divergence" || type === "and_convergence";
   const boxWidth = isBranch ? 360 : 100;
-  const left = e.clientX - rect.left - (boxWidth / 2);
-  const top = e.clientY - rect.top - 30;
+  const left = (e.clientX - rect.left) / currentZoom - (boxWidth / 2);
+  const top = (e.clientY - rect.top) / currentZoom - 30;
 
   const clone = template.cloneNode(true);
   clone.style.position = "absolute";
@@ -165,8 +171,8 @@ function makeDraggable(box) {
     moved = false;
 
     function move(ev) {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
+      const dx = (ev.clientX - startX) / currentZoom;
+      const dy = (ev.clientY - startY) / currentZoom;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
         moved = true;
       }
@@ -259,8 +265,8 @@ function attachConnectorListeners(box) {
       const svg = getOrCreateSVG();
       const rect = canvas.getBoundingClientRect();
       const connRect = connector.getBoundingClientRect();
-      const x = connRect.left + connRect.width / 2 - rect.left;
-      const y = connector.classList.contains("top") ? connRect.top - rect.top : connRect.bottom - rect.top;
+      const x = (connRect.left + connRect.width / 2 - rect.left) / currentZoom;
+      const y = (connector.classList.contains("top") ? connRect.top - rect.top : connRect.bottom - rect.top) / currentZoom;
       const connBranch = connector.getAttribute("data-branch");
 
       if (!currentConnection) {
@@ -320,8 +326,8 @@ function attachConnectorListeners(box) {
             branch: connBranch
           },
           mouseMoveHandler: ev => {
-            const mx = ev.clientX - rect.left;
-            const my = ev.clientY - rect.top;
+            const mx = (ev.clientX - rect.left) / currentZoom;
+            const my = (ev.clientY - rect.top) / currentZoom;
             currentConnection.polyline.setAttribute("points", `${x},${y} ${mx},${my}`);
           }
         };
@@ -417,11 +423,11 @@ function attachConnectorListeners(box) {
         }
 
         const fromConn = getConnectorElement(currentConnection.from.box, currentConnection.from.connector, currentConnection.from.branch);
-        const fromRect = fromConn ? fromConn.getBoundingClientRect() : { left: x, top: y, width: 6, bottom: y };
-        const fromX = fromRect.left + fromRect.width / 2 - rect.left;
-        const fromY = currentConnection.from.connector === "bottom"
+        const fromRect = fromConn ? fromConn.getBoundingClientRect() : null;
+        const fromX = fromRect ? (fromRect.left + fromRect.width / 2 - rect.left) / currentZoom : x;
+        const fromY = fromRect ? (currentConnection.from.connector === "bottom"
           ? fromRect.bottom - rect.top
-          : fromRect.top - rect.top;
+          : fromRect.top - rect.top) / currentZoom : y;
 
         const toX = x;
         const toY = y;
@@ -615,9 +621,9 @@ function calculatePolylinePoints(fromX, fromY, toX, toY, fromConnector, toConnec
     const boxes = canvas.querySelectorAll(".box");
     boxes.forEach(b => {
       const bRect = b.getBoundingClientRect();
-      const bLeft = bRect.left - canvasRect.left;
-      const bTop = bRect.top - canvasRect.top;
-      const bBottom = bRect.bottom - canvasRect.top;
+      const bLeft = (bRect.left - canvasRect.left) / currentZoom;
+      const bTop = (bRect.top - canvasRect.top) / currentZoom;
+      const bBottom = (bRect.bottom - canvasRect.top) / currentZoom;
 
       if (bBottom >= toY - 40 && bTop <= fromY + 40) {
         if (bLeft < minLeft) {
@@ -654,15 +660,15 @@ function updateConnections(box) {
       const fromRect = fromConn.getBoundingClientRect();
       const toRect = toConn.getBoundingClientRect();
 
-      const fromX = fromRect.left + fromRect.width / 2 - rect.left;
-      const fromY = conn.from.connector === "top"
+      const fromX = (fromRect.left + fromRect.width / 2 - rect.left) / currentZoom;
+      const fromY = (conn.from.connector === "top"
         ? fromRect.top - rect.top
-        : fromRect.bottom - rect.top;
+        : fromRect.bottom - rect.top) / currentZoom;
 
-      const toX = toRect.left + toRect.width / 2 - rect.left;
-      const toY = conn.to.connector === "top"
+      const toX = (toRect.left + toRect.width / 2 - rect.left) / currentZoom;
+      const toY = (conn.to.connector === "top"
         ? toRect.top - rect.top
-        : toRect.bottom - rect.top;
+        : toRect.bottom - rect.top) / currentZoom;
 
       const points = calculatePolylinePoints(fromX, fromY, toX, toY, conn.from.connector, conn.to.connector);
 
@@ -1849,10 +1855,59 @@ setTimeout(() => {
 
 const viewport = document.getElementById("canvas-viewport");
 
+function updateZoomDisplay() {
+  const resetBtn = document.getElementById("nav-zoom-reset");
+  if (resetBtn) {
+    resetBtn.textContent = `${Math.round(currentZoom * 100)}%`;
+  }
+}
+
+function setZoom(newZoom, clientX, clientY) {
+  if (!viewport || !canvas) return;
+  const clampedZoom = Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM);
+  if (Math.abs(clampedZoom - currentZoom) < 0.001) return;
+
+  const previousZoom = currentZoom;
+  const rect = viewport.getBoundingClientRect();
+
+  // Ponto focal: se fornecido o ponteiro (mouse/touchpad), usa sua posição relativa;
+  // caso contrário (ex: clique no botão ou atalho), usa o centro da área visível.
+  const mouseX = (clientX !== undefined) ? (clientX - rect.left) : (viewport.clientWidth / 2);
+  const mouseY = (clientY !== undefined) ? (clientY - rect.top) : (viewport.clientHeight / 2);
+
+  // Coordenadas mundiais antes do zoom
+  const worldX = (viewport.scrollLeft + mouseX) / previousZoom;
+  const worldY = (viewport.scrollTop + mouseY) / previousZoom;
+
+  currentZoom = clampedZoom;
+  canvas.style.transformOrigin = "0 0";
+  canvas.style.transform = `scale(${currentZoom})`;
+
+  // Reposiciona o scroll para manter o ponto fixo no mesmo local da tela
+  viewport.scrollLeft = worldX * currentZoom - mouseX;
+  viewport.scrollTop = worldY * currentZoom - mouseY;
+
+  updateZoomDisplay();
+}
+
+function zoomIn() {
+  setZoom(currentZoom + ZOOM_STEP);
+}
+
+function zoomOut() {
+  setZoom(currentZoom - ZOOM_STEP);
+}
+
+function resetZoom() {
+  setZoom(1.0);
+}
+
 function centerCanvasViewport() {
   if (!viewport || !canvas) return;
-  const scrollLeft = (canvas.scrollWidth - viewport.clientWidth) / 2;
-  const scrollTop = (canvas.scrollHeight - viewport.clientHeight) / 2;
+  const canvasWidth = canvas.offsetWidth * currentZoom;
+  const canvasHeight = canvas.offsetHeight * currentZoom;
+  const scrollLeft = (canvasWidth - viewport.clientWidth) / 2;
+  const scrollTop = (canvasHeight - viewport.clientHeight) / 2;
   viewport.scrollTo({
     left: scrollLeft,
     top: scrollTop,
@@ -1902,9 +1957,25 @@ if (viewport) {
       viewport.classList.remove("panning");
     }
   });
+
+  // 2. Evento Wheel: Combinação de Scroll e Zoom (Abordagem A)
+  // Ctrl + Roda (ou pinch no touchpad) -> Zoom In / Zoom Out focado no cursor
+  // Shift + Roda -> Rolagem horizontal
+  // Roda normal -> Rolagem vertical padrão
+  viewport.addEventListener("wheel", e => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      // Ajuste proporcional do zoom; deltaY pode ser contínuo (touchpad) ou discreto (wheel)
+      const zoomDelta = -e.deltaY * 0.0015;
+      setZoom(currentZoom + zoomDelta, e.clientX, e.clientY);
+    } else if (e.shiftKey) {
+      e.preventDefault();
+      viewport.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
 }
 
-// 2. Botões de Navegação Flutuante (Setas e Centralizar)
+// 3. Botões de Navegação Flutuante (Setas, Centralizar e Zoom)
 document.getElementById("nav-up")?.addEventListener("click", () => {
   if (viewport) viewport.scrollBy({ top: -300, behavior: 'smooth' });
 });
@@ -1919,6 +1990,35 @@ document.getElementById("nav-right")?.addEventListener("click", () => {
 });
 document.getElementById("nav-center")?.addEventListener("click", () => {
   centerCanvasViewport();
+});
+document.getElementById("nav-zoom-in")?.addEventListener("click", () => {
+  zoomIn();
+});
+document.getElementById("nav-zoom-out")?.addEventListener("click", () => {
+  zoomOut();
+});
+document.getElementById("nav-zoom-reset")?.addEventListener("click", () => {
+  resetZoom();
+});
+
+// 4. Atalhos de Teclado Globais para Zoom
+window.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    return;
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") {
+      e.preventDefault();
+      zoomIn();
+    } else if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") {
+      e.preventDefault();
+      zoomOut();
+    } else if (e.key === "0" || e.code === "Numpad0") {
+      e.preventDefault();
+      resetZoom();
+    }
+  }
 });
 
 
