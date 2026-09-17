@@ -10,6 +10,7 @@ class SimulationRackManager {
     this.isDockCollapsed = false;
     this.discoveredIO = {
       inputs: new Set(),
+      remotes: new Set(),
       analogs: new Set(),
       outputs: new Set(),
       timers: new Set()
@@ -101,19 +102,27 @@ class SimulationRackManager {
 
   discoverIO(ir) {
     this.discoveredIO.inputs.clear();
+    this.discoveredIO.remotes.clear();
     this.discoveredIO.analogs.clear();
     this.discoveredIO.outputs.clear();
     this.discoveredIO.timers.clear();
 
-    // Escanear receptividades de transições para descobrir I e A
+    // Escanear receptividades de transições para descobrir I, R e A
     if (ir.transitions) {
       for (const t of ir.transitions) {
         const text = t.receptivity || "";
-        // Match entradas digitais (ex: I1, I2, E1)
+        // Match entradas digitais físicas (ex: I1, I2, E1)
         const iMatches = text.match(/\b[IE](\d+)\b/gi) || [];
         for (const m of iMatches) {
           const ch = parseInt(m.substring(1), 10);
           if (!isNaN(ch)) this.discoveredIO.inputs.add(ch);
+        }
+
+        // Match entradas remotas (ex: R1, R2 - MQTT / Web GUI)
+        const rMatches = text.match(/\bR(\d+)\b/gi) || [];
+        for (const m of rMatches) {
+          const ch = parseInt(m.substring(1), 10);
+          if (!isNaN(ch)) this.discoveredIO.remotes.add(ch);
         }
 
         // Match entradas analógicas (ex: A1, A2)
@@ -213,7 +222,70 @@ class SimulationRackManager {
       bodyEl.appendChild(inputModule);
     }
 
-    // 2. Módulo: Entradas Analógicas (Sliders & Displays)
+    // 2. Módulo: Entradas Remotas (R) / Web & MQTT
+    const sortedRemotes = Array.from(this.discoveredIO.remotes).sort((a, b) => a - b);
+    if (sortedRemotes.length > 0) {
+      const remoteModule = document.createElement("div");
+      remoteModule.className = "rack-module remote-module";
+      remoteModule.innerHTML = `
+        <div class="module-title">
+          <span>Entradas Remotas (R)</span>
+          <span style="font-size: 9px; color: #38bdf8;">🌐 Web / MQTT</span>
+        </div>
+        <div class="module-grid" id="rack-remotes-grid"></div>
+      `;
+
+      const grid = remoteModule.querySelector("#rack-remotes-grid");
+
+      sortedRemotes.forEach(ch => {
+        const item = document.createElement("div");
+        item.className = "pushbutton-wrapper remote-wrapper";
+        item.innerHTML = `
+          <button class="pushbutton remote-pushbutton" id="btn-remote-${ch}" title="Enviar Pulso R${ch} (MQTT / Web)">
+            <span class="remote-btn-icon">📡</span>
+          </button>
+          <div class="pushbutton-label remote-label">R${ch}</div>
+          <div class="switch-wrapper" title="Manter R${ch} Ativo (MQTT Retain / Flag)">
+            <label class="toggle-switch">
+              <input type="checkbox" id="chk-remote-${ch}">
+              <span class="slider-toggle remote-toggle"></span>
+            </label>
+          </div>
+        `;
+
+        const btn = item.querySelector(`#btn-remote-${ch}`);
+        const chk = item.querySelector(`#chk-remote-${ch}`);
+
+        // Eventos de Botoeira Momentânea (Pushbutton Remoto)
+        const press = (e) => {
+          e.preventDefault();
+          btn.classList.add("pressed");
+          if (!chk.checked) this.engine?.setRemoteInput(ch, true);
+        };
+
+        const release = (e) => {
+          e.preventDefault();
+          btn.classList.remove("pressed");
+          if (!chk.checked) this.engine?.setRemoteInput(ch, false);
+        };
+
+        btn.addEventListener("mousedown", press);
+        window.addEventListener("mouseup", release);
+        btn.addEventListener("touchstart", press, { passive: false });
+        window.addEventListener("touchend", release);
+
+        // Evento de Chave com Trava (Toggle Remoto)
+        chk.addEventListener("change", () => {
+          this.engine?.setRemoteInput(ch, chk.checked);
+        });
+
+        grid.appendChild(item);
+      });
+
+      bodyEl.appendChild(remoteModule);
+    }
+
+    // 3. Módulo: Entradas Analógicas (Sliders & Displays)
     const sortedAnalogs = Array.from(this.discoveredIO.analogs).sort((a, b) => a - b);
     if (sortedAnalogs.length > 0) {
       const analogModule = document.createElement("div");
@@ -331,6 +403,17 @@ class SimulationRackManager {
       if (led) led.classList.toggle("on", isEnergized);
       if (relay) relay.classList.toggle("energized", isEnergized);
     });
+
+    // 1.1. Atualizar Entradas Remotas (R)
+    if (state.remotes) {
+      this.discoveredIO.remotes.forEach(ch => {
+        const isRemoteActive = Boolean(state.remotes[ch]);
+        const btn = document.getElementById(`btn-remote-${ch}`);
+        if (btn) {
+          btn.classList.toggle("active-remote", isRemoteActive);
+        }
+      });
+    }
 
     // 2. Atualizar Temporizadores
     this.discoveredIO.timers.forEach(ch => {

@@ -13,6 +13,7 @@ export interface SimulationState {
   activeSteps: number[];
   validTransitions: number[]; // Transições que estão habilitadas e com receptividade verdadeira
   inputs: Record<number, boolean>;
+  remotes: Record<number, boolean>; // R1..R8 (Entradas remotas / MQTT / GUI)
   analogs: Record<number, number>;
   outputs: Record<number, boolean>;
   memories: Record<number, boolean>;
@@ -29,6 +30,7 @@ export class GrafcetSimulatorEngine {
   private previousActiveSteps: Set<number> = new Set();
 
   private inputs: Map<number, boolean> = new Map();
+  private remotes: Map<number, boolean> = new Map();
   private analogs: Map<number, number> = new Map();
   private outputs: Map<number, boolean> = new Map();
   private memories: Map<number, boolean> = new Map();
@@ -62,6 +64,8 @@ export class GrafcetSimulatorEngine {
   public reset(): void {
     this.activeSteps.clear();
     this.previousActiveSteps.clear();
+    this.inputs.clear();
+    this.remotes.clear();
     this.outputs.clear();
     this.memories.clear();
     this.timers.clear();
@@ -95,10 +99,18 @@ export class GrafcetSimulatorEngine {
   }
 
   /**
-   * Define o estado de uma entrada digital (I1, I2, etc.)
+   * Define o estado de uma entrada digital física (I1, I2, etc.)
    */
   public setDigitalInput(channel: number, value: boolean): void {
     this.inputs.set(channel, value);
+    this.notifyState();
+  }
+
+  /**
+   * Define o estado de uma entrada remota (R1, R2, etc. - MQTT / Web GUI)
+   */
+  public setRemoteInput(channel: number, value: boolean): void {
+    this.remotes.set(channel, value);
     this.notifyState();
   }
 
@@ -263,6 +275,9 @@ export class GrafcetSimulatorEngine {
     const inputsObj: Record<number, boolean> = {};
     this.inputs.forEach((v, k) => { inputsObj[k] = v; });
 
+    const remotesObj: Record<number, boolean> = {};
+    this.remotes.forEach((v, k) => { remotesObj[k] = v; });
+
     const analogsObj: Record<number, number> = {};
     this.analogs.forEach((v, k) => { analogsObj[k] = v; });
 
@@ -276,6 +291,7 @@ export class GrafcetSimulatorEngine {
       activeSteps: Array.from(this.activeSteps),
       validTransitions: validTransitions,
       inputs: inputsObj,
+      remotes: remotesObj,
       analogs: analogsObj,
       outputs: outputsObj,
       memories: memoriesObj,
@@ -442,6 +458,7 @@ export class GrafcetSimulatorEngine {
 
     return {
       inputs: this.inputs,
+      remotes: this.remotes,
       analogs: this.analogs,
       memories: this.memories,
       steps: stepBools,

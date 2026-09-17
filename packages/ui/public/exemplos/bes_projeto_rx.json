@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "name": "Projeto BES Rx (R1, R2, I1)",
+  "counters": {
+    "boxCounter": 7,
+    "transitionCounter": 7
+  },
+  "steps": [
+    {
+      "id": 1,
+      "type": "start_step",
+      "state": "active",
+      "position": { "left": "500px", "top": "120px" },
+      "inputs": [7],
+      "outputs": [6],
+      "transitions": [
+        { "id": 1, "triggered": false, "receptivity": "R1", "description": "Disparo Remoto R1" }
+      ],
+      "actions": []
+    },
+    {
+      "id": 6,
+      "type": "and_divergence",
+      "position": { "left": "400px", "top": "240px" },
+      "inputs": [1],
+      "outputs": [],
+      "branchOutputs": { "0": 2, "1": 3 },
+      "transitions": [
+        { "id": 6, "receptivity": "R1", "description": "Divergência AND R1" }
+      ],
+      "actions": []
+    },
+    {
+      "id": 2,
+      "type": "active_step",
+      "state": "inactive",
+      "position": { "left": "360px", "top": "340px" },
+      "inputs": [6],
+      "outputs": [4],
+      "transitions": [
+        { "id": 2, "triggered": false, "receptivity": "R1", "description": "Avanço Ramal Esq R1" }
+      ],
+      "actions": [
+        { "id": 1, "qualifier": "X", "resourceType": "Q", "channel": 1, "target": "Q1" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "active_step",
+      "state": "inactive",
+      "position": { "left": "640px", "top": "340px" },
+      "inputs": [6],
+      "outputs": [5],
+      "transitions": [
+        { "id": 3, "triggered": false, "receptivity": "R2", "description": "Avanço Ramal Dir R2" }
+      ],
+      "actions": [
+        { "id": 2, "qualifier": "X", "resourceType": "Q", "channel": 2, "target": "Q2" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "active_step",
+      "state": "inactive",
+      "position": { "left": "360px", "top": "500px" },
+      "inputs": [2],
+      "outputs": [7],
+      "transitions": [
+        { "id": 4, "triggered": false, "receptivity": "1", "description": "" }
+      ],
+      "actions": [
+        { "id": 3, "qualifier": "X", "resourceType": "Q", "channel": 2, "target": "Q2" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "active_step",
+      "state": "inactive",
+      "position": { "left": "640px", "top": "500px" },
+      "inputs": [3],
+      "outputs": [7],
+      "transitions": [
+        { "id": 5, "triggered": false, "receptivity": "1", "description": "" }
+      ],
+      "actions": [
+        { "id": 4, "qualifier": "X", "resourceType": "Q", "channel": 1, "target": "Q1" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "and_convergence",
+      "position": { "left": "400px", "top": "660px" },
+      "inputs": [],
+      "branchInputs": { "0": 4, "1": 5 },
+      "outputs": [1],
+      "transitions": [
+        { "id": 7, "receptivity": "I1", "description": "Sincronização I1" }
+      ],
+      "actions": []
+    }
+  ],
+  "connections": []
+}

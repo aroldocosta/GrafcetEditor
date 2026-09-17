@@ -108,6 +108,7 @@ class ExpressionEvaluator {
 
     switch (prefix) {
       case 'I': return context.inputs.get(num) ?? false;
+      case 'R': return context.remotes?.get(num) ?? false;
       case 'M': return context.memories.get(num) ?? false;
       case 'X': return context.steps.get(num) ?? false;
       case 'T': return context.timers.get(num) ?? false;
@@ -124,6 +125,7 @@ class GrafcetSimulatorEngine {
     this.previousActiveSteps = new Set();
 
     this.inputs = new Map();
+    this.remotes = new Map();
     this.analogs = new Map();
     this.outputs = new Map();
     this.memories = new Map();
@@ -150,6 +152,8 @@ class GrafcetSimulatorEngine {
   reset() {
     this.activeSteps.clear();
     this.previousActiveSteps.clear();
+    this.inputs.clear();
+    this.remotes.clear();
     this.outputs.clear();
     this.memories.clear();
     this.timers.clear();
@@ -181,6 +185,11 @@ class GrafcetSimulatorEngine {
 
   setDigitalInput(channel, value) {
     this.inputs.set(Number(channel), Boolean(value));
+    this.notifyState();
+  }
+
+  setRemoteInput(channel, value) {
+    this.remotes.set(Number(channel), Boolean(value));
     this.notifyState();
   }
 
@@ -301,6 +310,9 @@ class GrafcetSimulatorEngine {
     const inputsObj = {};
     this.inputs.forEach((v, k) => { inputsObj[k] = v; });
 
+    const remotesObj = {};
+    this.remotes.forEach((v, k) => { remotesObj[k] = v; });
+
     const analogsObj = {};
     this.analogs.forEach((v, k) => { analogsObj[k] = v; });
 
@@ -314,6 +326,7 @@ class GrafcetSimulatorEngine {
       activeSteps: Array.from(this.activeSteps),
       validTransitions: validTransitions,
       inputs: inputsObj,
+      remotes: remotesObj,
       analogs: analogsObj,
       outputs: outputsObj,
       memories: memoriesObj,
@@ -468,6 +481,7 @@ class GrafcetSimulatorEngine {
 
     return {
       inputs: this.inputs,
+      remotes: this.remotes,
       analogs: this.analogs,
       memories: this.memories,
       steps: stepBools,

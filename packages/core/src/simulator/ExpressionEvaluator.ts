@@ -11,6 +11,7 @@
 
 export interface SimulationVariableContext {
   inputs: Map<number, boolean>;          // I1, I2...
+  remotes?: Map<number, boolean>;        // R1, R2... (Entradas remotas / MQTT / GUI)
   analogs: Map<number, number>;          // A1, A2...
   memories: Map<number, boolean>;        // M1, M2...
   steps: Map<number, boolean>;           // X1, X2...
@@ -144,6 +145,8 @@ export class ExpressionEvaluator {
     switch (prefix) {
       case 'I':
         return context.inputs.get(num) ?? false;
+      case 'R':
+        return context.remotes?.get(num) ?? false;
       case 'M':
         return context.memories.get(num) ?? false;
       case 'X':

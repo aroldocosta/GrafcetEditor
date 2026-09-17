@@ -4,6 +4,7 @@ export class GrafcetSimulatorEngine {
     activeSteps = new Set();
     previousActiveSteps = new Set();
     inputs = new Map();
+    remotes = new Map();
     analogs = new Map();
     outputs = new Map();
     memories = new Map();
@@ -32,6 +33,8 @@ export class GrafcetSimulatorEngine {
     reset() {
         this.activeSteps.clear();
         this.previousActiveSteps.clear();
+        this.inputs.clear();
+        this.remotes.clear();
         this.outputs.clear();
         this.memories.clear();
         this.timers.clear();
@@ -61,10 +64,17 @@ export class GrafcetSimulatorEngine {
         this.notifyState();
     }
     /**
-     * Define o estado de uma entrada digital (I1, I2, etc.)
+     * Define o estado de uma entrada digital física (I1, I2, etc.)
      */
     setDigitalInput(channel, value) {
         this.inputs.set(channel, value);
+        this.notifyState();
+    }
+    /**
+     * Define o estado de uma entrada remota (R1, R2, etc. - MQTT / Web GUI)
+     */
+    setRemoteInput(channel, value) {
+        this.remotes.set(channel, value);
         this.notifyState();
     }
     /**
@@ -210,6 +220,8 @@ export class GrafcetSimulatorEngine {
         });
         const inputsObj = {};
         this.inputs.forEach((v, k) => { inputsObj[k] = v; });
+        const remotesObj = {};
+        this.remotes.forEach((v, k) => { remotesObj[k] = v; });
         const analogsObj = {};
         this.analogs.forEach((v, k) => { analogsObj[k] = v; });
         const outputsObj = {};
@@ -220,6 +232,7 @@ export class GrafcetSimulatorEngine {
             activeSteps: Array.from(this.activeSteps),
             validTransitions: validTransitions,
             inputs: inputsObj,
+            remotes: remotesObj,
             analogs: analogsObj,
             outputs: outputsObj,
             memories: memoriesObj,
@@ -375,6 +388,7 @@ export class GrafcetSimulatorEngine {
         }
         return {
             inputs: this.inputs,
+            remotes: this.remotes,
             analogs: this.analogs,
             memories: this.memories,
             steps: stepBools,

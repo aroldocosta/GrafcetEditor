@@ -139,6 +139,8 @@ export class ExpressionEvaluator {
         switch (prefix) {
             case 'I':
                 return context.inputs.get(num) ?? false;
+            case 'R':
+                return context.remotes?.get(num) ?? false;
             case 'M':
                 return context.memories.get(num) ?? false;
             case 'X':

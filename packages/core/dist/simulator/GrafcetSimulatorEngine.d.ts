@@ -10,6 +10,7 @@ export interface SimulationState {
     activeSteps: number[];
     validTransitions: number[];
     inputs: Record<number, boolean>;
+    remotes: Record<number, boolean>;
     analogs: Record<number, number>;
     outputs: Record<number, boolean>;
     memories: Record<number, boolean>;
@@ -28,6 +29,7 @@ export declare class GrafcetSimulatorEngine {
     private activeSteps;
     private previousActiveSteps;
     private inputs;
+    private remotes;
     private analogs;
     private outputs;
     private memories;
@@ -47,9 +49,13 @@ export declare class GrafcetSimulatorEngine {
      */
     reset(): void;
     /**
-     * Define o estado de uma entrada digital (I1, I2, etc.)
+     * Define o estado de uma entrada digital física (I1, I2, etc.)
      */
     setDigitalInput(channel: number, value: boolean): void;
+    /**
+     * Define o estado de uma entrada remota (R1, R2, etc. - MQTT / Web GUI)
+     */
+    setRemoteInput(channel: number, value: boolean): void;
     /**
      * Define o valor de uma entrada analógica (A1, A2, etc.)
      */

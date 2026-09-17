@@ -10,6 +10,7 @@
  */
 export interface SimulationVariableContext {
     inputs: Map<number, boolean>;
+    remotes?: Map<number, boolean>;
     analogs: Map<number, number>;
     memories: Map<number, boolean>;
     steps: Map<number, boolean>;
