@@ -131,6 +131,13 @@ class SimulationRackManager {
           const ch = parseInt(m.substring(1), 10);
           if (!isNaN(ch)) this.discoveredIO.analogs.add(ch);
         }
+
+        // Match temporizadores (ex: T1, T2)
+        const tMatches = text.match(/\bT(\d+)\b/gi) || [];
+        for (const m of tMatches) {
+          const ch = parseInt(m.substring(1), 10);
+          if (!isNaN(ch)) this.discoveredIO.timers.add(ch);
+        }
       }
     }
 
@@ -373,11 +380,19 @@ class SimulationRackManager {
       const grid = timerModule.querySelector("#rack-timers-grid");
 
       sortedTimers.forEach(ch => {
+        const timerCfg = this.engine?.ir?.timers?.find(t => t.id === ch) || this.engine?.timers?.get(ch);
+        const funct = timerCfg?.funct ?? timerCfg?.functionType ?? 1;
+        const modeLabel = funct === 2 ? 'TOFF' : funct === 3 ? 'INT' : 'TON';
+        const modeClass = funct === 2 ? 'toff' : funct === 3 ? 'int' : 'ton';
+
         const item = document.createElement("div");
         item.className = "timer-bar-wrapper";
         item.innerHTML = `
           <div class="timer-header">
-            <span>Timer T${ch}</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>Timer T${ch}</span>
+              <span class="timer-mode-badge ${modeClass}">${modeLabel}</span>
+            </div>
             <span id="timer-val-${ch}" style="color: #38bdf8;">0.0s</span>
           </div>
           <div class="timer-progress-bg">
@@ -415,19 +430,46 @@ class SimulationRackManager {
       });
     }
 
-    // 2. Atualizar Temporizadores
+    // 2. Atualizar Temporizadores (TON, TOFF, INTERMITENTE)
     this.discoveredIO.timers.forEach(ch => {
       const timerState = state.timers[ch];
       const bar = document.getElementById(`timer-bar-${ch}`);
       const val = document.getElementById(`timer-val-${ch}`);
 
       if (timerState && bar && val) {
-        const pct = timerState.presetMs > 0 
-          ? Math.min(100, (timerState.elapsedMs / timerState.presetMs) * 100) 
-          : 0;
-        bar.style.width = `${pct}%`;
-        bar.classList.toggle("done", timerState.done);
-        val.textContent = `${(timerState.elapsedMs / 1000).toFixed(1)}s / ${(timerState.presetMs / 1000).toFixed(1)}s`;
+        const funct = timerState.funct || 1;
+        const presetSec = (timerState.presetMs / 1000).toFixed(1);
+        const elapsedSec = (timerState.elapsedMs / 1000).toFixed(1);
+
+        if (funct === 3) {
+          // INTERMITENTE (Oscilador)
+          const tOn = timerState.presetMs > 0 ? timerState.presetMs : 1000;
+          const tOff = timerState.offsetMs > 0 ? timerState.offsetMs : tOn;
+          const totalCycle = (tOn + tOff) / 1000;
+          const pct = Math.min(100, (timerState.elapsedMs / (tOn + tOff)) * 100);
+          bar.style.width = `${pct}%`;
+          bar.classList.toggle("done", timerState.done);
+          bar.classList.toggle("intermittent-active", timerState.done);
+          val.textContent = `${elapsedSec}s / ${totalCycle.toFixed(1)}s [${timerState.done ? 'ON' : 'OFF'}]`;
+        } else if (funct === 2) {
+          // TOFF (Atraso no Desligamento)
+          const pct = timerState.presetMs > 0 
+            ? Math.min(100, (timerState.elapsedMs / timerState.presetMs) * 100) 
+            : 0;
+          bar.style.width = `${pct}%`;
+          bar.classList.toggle("done", timerState.done);
+          bar.classList.toggle("toff-delay", timerState.done && !timerState.active);
+          const statusDesc = timerState.active ? 'RETIDO' : (timerState.done ? 'ATRASO' : 'OFF');
+          val.textContent = `${elapsedSec}s / ${presetSec}s (${statusDesc})`;
+        } else {
+          // TON (Atraso na Ligação)
+          const pct = timerState.presetMs > 0 
+            ? Math.min(100, (timerState.elapsedMs / timerState.presetMs) * 100) 
+            : 0;
+          bar.style.width = `${pct}%`;
+          bar.classList.toggle("done", timerState.done);
+          val.textContent = `${elapsedSec}s / ${presetSec}s`;
+        }
       }
     });
 

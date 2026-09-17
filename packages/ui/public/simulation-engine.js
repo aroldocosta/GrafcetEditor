@@ -161,15 +161,63 @@ class GrafcetSimulatorEngine {
 
     if (!this.ir) return;
 
+    // Inicializar timers declarados em ir.timers
     if (this.ir.timers) {
       for (const t of this.ir.timers) {
         this.timers.set(t.id, {
           id: t.id,
+          funct: t.funct ?? t.functionType ?? 1,
           presetMs: (t.preset ?? 5) * 1000,
+          offsetMs: (t.offset ?? 0) * 1000,
           elapsedMs: 0,
           done: false,
           active: false
         });
+      }
+    }
+
+    // Auto-descobrir timers em ações de etapas caso não declarados em ir.timers
+    for (const step of this.ir.steps) {
+      if (step.actions) {
+        for (const a of step.actions) {
+          if ((a.resourceType === 'T' || a.qualifier === 'T') && a.channel) {
+            const ch = Number(a.channel);
+            if (!isNaN(ch) && (!this.timers.has(ch) || a.preset !== undefined)) {
+              this.timers.set(ch, {
+                id: ch,
+                funct: a.functionType ?? (this.timers.get(ch)?.funct ?? 1),
+                presetMs: (a.preset !== undefined ? a.preset : (this.timers.get(ch)?.presetMs ? this.timers.get(ch).presetMs / 1000 : 5)) * 1000,
+                offsetMs: (a.offset !== undefined ? a.offset : (this.timers.get(ch)?.offsetMs ? this.timers.get(ch).offsetMs / 1000 : 0)) * 1000,
+                elapsedMs: 0,
+                done: false,
+                active: false
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Auto-descobrir timers em receptividades de transições caso não declarados
+    for (const trans of this.ir.transitions) {
+      if (trans.receptivity) {
+        const matches = trans.receptivity.match(/\bT(\d+)\b/gi);
+        if (matches) {
+          for (const m of matches) {
+            const ch = parseInt(m.substring(1), 10);
+            if (!isNaN(ch) && !this.timers.has(ch)) {
+              this.timers.set(ch, {
+                id: ch,
+                funct: 1,
+                presetMs: 5000,
+                offsetMs: 0,
+                elapsedMs: 0,
+                done: false,
+                active: false
+              });
+            }
+          }
+        }
       }
     }
 
@@ -179,6 +227,7 @@ class GrafcetSimulatorEngine {
       }
     }
 
+    this.updateTimers(0);
     this.executeActions(0);
     this.notifyState();
   }
@@ -352,19 +401,56 @@ class GrafcetSimulatorEngine {
     }
 
     this.timers.forEach((timer, channel) => {
-      if (activeTimerChannels.has(channel)) {
-        timer.active = true;
-        if (!timer.done) {
-          timer.elapsedMs += dtMs;
-          if (timer.elapsedMs >= timer.presetMs) {
-            timer.elapsedMs = timer.presetMs;
-            timer.done = true;
+      const isInputActive = activeTimerChannels.has(channel);
+      timer.active = isInputActive;
+
+      switch (timer.funct) {
+        case 1: // TON - On-Delay
+        default:
+          if (isInputActive) {
+            if (!timer.done) {
+              timer.elapsedMs += dtMs;
+              if (timer.elapsedMs >= timer.presetMs) {
+                timer.elapsedMs = timer.presetMs;
+                timer.done = true;
+              }
+            }
+          } else {
+            timer.elapsedMs = 0;
+            timer.done = false;
           }
-        }
-      } else {
-        timer.active = false;
-        timer.elapsedMs = 0;
-        timer.done = false;
+          break;
+
+        case 2: // TOFF - Off-Delay
+          if (isInputActive) {
+            timer.done = true;
+            timer.elapsedMs = 0;
+          } else {
+            if (timer.done) {
+              timer.elapsedMs += dtMs;
+              if (timer.elapsedMs >= timer.presetMs) {
+                timer.elapsedMs = timer.presetMs;
+                timer.done = false;
+              }
+            } else {
+              timer.elapsedMs = 0;
+            }
+          }
+          break;
+
+        case 3: // INTERMITENTE - Oscilador Cíclico
+          if (isInputActive) {
+            const tOn = timer.presetMs > 0 ? timer.presetMs : 1000;
+            const tOff = timer.offsetMs > 0 ? timer.offsetMs : tOn;
+            const totalCycle = tOn + tOff;
+
+            timer.elapsedMs = (timer.elapsedMs + dtMs) % totalCycle;
+            timer.done = (timer.elapsedMs < tOn);
+          } else {
+            timer.elapsedMs = 0;
+            timer.done = false;
+          }
+          break;
       }
     });
   }

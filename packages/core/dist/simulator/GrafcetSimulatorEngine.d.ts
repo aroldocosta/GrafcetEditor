@@ -1,7 +1,9 @@
 import { GrafcetIR } from '../ir/GrafcetIR.js';
 export interface TimerState {
     id: number;
+    funct: number;
     presetMs: number;
+    offsetMs: number;
     elapsedMs: number;
     done: boolean;
     active: boolean;
@@ -15,8 +17,11 @@ export interface SimulationState {
     outputs: Record<number, boolean>;
     memories: Record<number, boolean>;
     timers: Record<number, {
+        id: number;
+        funct: number;
         elapsedMs: number;
         presetMs: number;
+        offsetMs: number;
         done: boolean;
         active: boolean;
     }>;

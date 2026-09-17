@@ -1456,20 +1456,37 @@ function showResourceConfigModal(actionData, onSave) {
 
     ${portHTML}
 
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Função (fun):</label>
-      <input type="number" id="param-fun" value="${actionData.functionType ?? (rType === 'A' ? 2 : 1)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
-    </div>
-
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Preset (pst):</label>
-      <input type="number" step="any" id="param-pst" value="${actionData.preset ?? (rType === 'A' ? 2.15 : 5)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
-    </div>
-
-    <div style="margin-bottom:15px;">
-      <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Offset (ofs):</label>
-      <input type="number" step="any" id="param-ofs" value="${actionData.offset ?? 0}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
-    </div>
+    ${rType === 'T' ? `
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Modo do Temporizador (fun):</label>
+        <select id="param-fun" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box; font-size:0.88rem; background:#fff;">
+          <option value="1" ${(actionData.functionType ?? 1) == 1 ? 'selected' : ''}>1 - TON (Atraso na Ligação / On-Delay)</option>
+          <option value="2" ${(actionData.functionType ?? 1) == 2 ? 'selected' : ''}>2 - TOFF (Atraso no Desligamento / Off-Delay)</option>
+          <option value="3" ${(actionData.functionType ?? 1) == 3 ? 'selected' : ''}>3 - INTERMITENTE (Oscilador Cíclico / Blink)</option>
+        </select>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Preset (pst) - Segundos:</label>
+        <input type="number" step="any" min="0.1" id="param-pst" value="${actionData.preset ?? 5}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:15px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Offset (ofs) - Segundos (Tempo OFF em Intermitente):</label>
+        <input type="number" step="any" min="0" id="param-ofs" value="${actionData.offset ?? 0}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+    ` : `
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Função (fun):</label>
+        <input type="number" id="param-fun" value="${actionData.functionType ?? (rType === 'A' ? 2 : 1)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Preset (pst):</label>
+        <input type="number" step="any" id="param-pst" value="${actionData.preset ?? (rType === 'A' ? 2.15 : 5)}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:15px;">
+        <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:3px;">Offset (ofs):</label>
+        <input type="number" step="any" id="param-ofs" value="${actionData.offset ?? 0}" style="width:100%; height:32px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">
+      </div>
+    `}
 
     <div style="text-align:right;">
       <button id="save-resource-params" style="background:#2563eb; color:#fff; padding:6px 14px; border:none; border-radius:4px; cursor:pointer;">Salvar Parâmetros</button>

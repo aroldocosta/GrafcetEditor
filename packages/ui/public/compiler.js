@@ -240,10 +240,45 @@ function buildGrafcetIR(stepsList) {
 
   steps.sort((a, b) => a.id - b.id);
 
+  // Coletar configurações de Timers declarados nas ações e transições
+  const timersMap = new Map();
+  steps.forEach((s) => {
+    (s.actions || []).forEach((a) => {
+      let resourceType = (a.resourceType || '').toUpperCase();
+      let channel = Number(a.channel);
+      if (resourceType === 'T' && !isNaN(channel)) {
+        if (!timersMap.has(channel) || a.preset !== undefined) {
+          timersMap.set(channel, {
+            id: channel,
+            funct: a.functionType ?? (timersMap.get(channel)?.funct ?? 1),
+            preset: a.preset ?? (timersMap.get(channel)?.preset ?? 5),
+            offset: a.offset ?? (timersMap.get(channel)?.offset ?? 0)
+          });
+        }
+      }
+    });
+  });
+
+  transitions.forEach((t) => {
+    if (t.receptivity) {
+      const timerMatches = t.receptivity.match(/\bT(\d+)\b/gi);
+      if (timerMatches) {
+        timerMatches.forEach((m) => {
+          const id = parseInt(m.substring(1), 10);
+          if (!isNaN(id) && !timersMap.has(id)) {
+            timersMap.set(id, { id: id, funct: 1, preset: 5, offset: 0 });
+          }
+        });
+      }
+    }
+  });
+
+  const timers = Array.from(timersMap.values()).sort((a, b) => a.id - b.id);
+
   return {
     steps: steps,
     transitions: transitions,
-    timers: [],
+    timers: timers,
     counters: [],
     comparats: []
   };

@@ -184,4 +184,119 @@ describe('GrafcetSimulatorEngine (IEC 60848)', () => {
     expect(engine.getState().outputs[1]).toBeFalsy();
     expect(engine.getState().outputs[2]).toBeFalsy();
   });
+
+  it('deve temporizar corretamente no modo TON (1 - On-Delay) e franquejar transição após preset', () => {
+    // Etapa 1 ativa timer T1 (TON, preset 2s). Transição 1->2 dispara com T1.
+    const ir: GrafcetIR = {
+      steps: [
+        {
+          id: 1,
+          isInitial: true,
+          actions: [{ qualifier: 'X', resourceType: 'T', channel: 1, functionType: 1, preset: 2 }]
+        },
+        { id: 2, isInitial: false, actions: [] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'T1' }
+      ]
+    };
+
+    const engine = new GrafcetSimulatorEngine(ir);
+    expect(engine.getState().activeSteps).toEqual([1]);
+    expect(engine.getState().timers[1].done).toBe(false);
+
+    // Avança 1 segundo (1000ms) - preset é 2000ms
+    engine.step(1000);
+    expect(engine.getState().timers[1].elapsedMs).toBe(1000);
+    expect(engine.getState().timers[1].done).toBe(false);
+    expect(engine.getState().activeSteps).toEqual([1]);
+
+    // Avança mais 1 segundo (total 2000ms) - atinge o preset
+    engine.step(1000);
+    expect(engine.getState().timers[1].elapsedMs).toBe(2000);
+    expect(engine.getState().timers[1].done).toBe(true);
+
+    // No ciclo com T1 verdadeiro, a transição para a Etapa 2 franqueia
+    engine.step(50);
+    expect(engine.getState().activeSteps).toEqual([2]);
+    // Com a saída da Etapa 1, o timer TON deve ter sido resetado
+    expect(engine.getState().timers[1].done).toBe(false);
+    expect(engine.getState().timers[1].elapsedMs).toBe(0);
+  });
+
+  it('deve temporizar corretamente no modo TOFF (2 - Off-Delay) mantendo nível alto pós-etapa', () => {
+    // Etapa 1 ativa timer T1 (TOFF, preset 2s)
+    const ir: GrafcetIR = {
+      steps: [
+        {
+          id: 1,
+          isInitial: true,
+          actions: [{ qualifier: 'X', resourceType: 'T', channel: 1, functionType: 2, preset: 2 }]
+        },
+        { id: 2, isInitial: false, actions: [] }
+      ],
+      transitions: [
+        { id: 1, fromSteps: [1], toSteps: [2], receptivity: 'I1' }
+      ]
+    };
+
+    const engine = new GrafcetSimulatorEngine(ir);
+
+    // Enquanto a etapa 1 está ativa, a saída T1 fica ligada imediatamente
+    expect(engine.getState().timers[1].done).toBe(true);
+    expect(engine.getState().timers[1].elapsedMs).toBe(0);
+
+    // Desativa a Etapa 1 forçando para a Etapa 2
+    engine.setDigitalInput(1, true);
+    engine.step(50);
+    expect(engine.getState().activeSteps).toEqual([2]);
+
+    // Etapa 1 desativou: início do Off-Delay! Saída T1 permanece true!
+    expect(engine.getState().timers[1].done).toBe(true);
+
+    // Avança 1 segundo do Off-Delay
+    engine.step(1000);
+    expect(engine.getState().timers[1].elapsedMs).toBe(1000);
+    expect(engine.getState().timers[1].done).toBe(true);
+
+    // Avança mais 1 segundo (atinge 2s de preset)
+    engine.step(1000);
+    expect(engine.getState().timers[1].elapsedMs).toBe(2000);
+    // Timer encerrou o off-delay e desligou a saída!
+    expect(engine.getState().timers[1].done).toBe(false);
+  });
+
+  it('deve oscilar periodicamente no modo INTERMITENTE (3 - Flasher/Oscilador)', () => {
+    // Etapa 1 ativa timer T1 (INTERMITENTE, preset 1s ligado, offset 1s desligado)
+    const ir: GrafcetIR = {
+      steps: [
+        {
+          id: 1,
+          isInitial: true,
+          actions: [{ qualifier: 'X', resourceType: 'T', channel: 1, functionType: 3, preset: 1, offset: 1 }]
+        }
+      ],
+      transitions: []
+    };
+
+    const engine = new GrafcetSimulatorEngine(ir);
+
+    // Fase ON inicial (0ms a 1000ms): 500ms decorridos -> done = true
+    engine.step(500);
+    expect(engine.getState().timers[1].done).toBe(true);
+
+    // Fase OFF (1000ms a 2000ms): mais 600ms (total 1100ms) -> done = false
+    engine.step(600);
+    expect(engine.getState().timers[1].done).toBe(false);
+
+    // Novo ciclo ON (mais 1000ms = 2100ms % 2000ms = 100ms) -> done = true
+    engine.step(1000);
+    expect(engine.getState().timers[1].done).toBe(true);
+
+    // Se desativar a etapa, o oscilador para e desliga
+    engine.forceStep(1, false);
+    engine.step(50);
+    expect(engine.getState().timers[1].done).toBe(false);
+    expect(engine.getState().timers[1].elapsedMs).toBe(0);
+  });
 });
