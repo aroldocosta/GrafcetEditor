@@ -1,0 +1,8 @@
+services:
+  grafceteditor-web:
+    image: ${DOCKER_IMAGE}
+    container_name: grafceteditor-web
+    ports:
+      - "8080:80"
+    restart: always
+
